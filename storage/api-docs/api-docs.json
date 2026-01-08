@@ -1,0 +1,495 @@
+{
+    "openapi": "3.0.0",
+    "info": {
+        "title": "Catalog API",
+        "description": "Public catalog endpoints",
+        "version": "1.0.0"
+    },
+    "servers": [
+        {
+            "url": "https://api.example.com",
+            "description": "Production"
+        }
+    ],
+    "paths": {
+        "/api/categories": {
+            "get": {
+                "tags": [
+                    "Categories"
+                ],
+                "summary": "Get categories",
+                "operationId": "9ccff7aa6acc1f3079a6b0e0b6463e69",
+                "parameters": [
+                    {
+                        "name": "parent",
+                        "in": "query",
+                        "required": false,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Paginated category list",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Categories"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/categories/{slug}": {
+            "get": {
+                "tags": [
+                    "Categories"
+                ],
+                "summary": "Get category details",
+                "operationId": "54a7c38ac5f993fe556805bb92d21e39",
+                "parameters": [
+                    {
+                        "name": "slug",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Category details",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Categories"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/products": {
+            "get": {
+                "tags": [
+                    "Products"
+                ],
+                "summary": "Get products",
+                "operationId": "4a0a1a1c6d1ef74a8b91ec82b2d99934",
+                "parameters": [
+                    {
+                        "name": "category",
+                        "in": "query",
+                        "required": false,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "brand",
+                        "in": "query",
+                        "required": false,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "filters[search][$contains]",
+                        "in": "query",
+                        "description": "Search products by name or slug",
+                        "required": false,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Paginated product catalog list",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ProductCatalogResponse"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/product/{slug}": {
+            "get": {
+                "tags": [
+                    "Products"
+                ],
+                "summary": "Get product details",
+                "operationId": "43a99e990fc3434d25e71111598956f0",
+                "parameters": [
+                    {
+                        "name": "slug",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Product details",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ProductDetail"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    },
+    "components": {
+        "schemas": {
+            "Brands": {
+                "properties": {
+                    "id": {
+                        "type": "string",
+                        "example": "01J2P9WQZ3YJ6R8X9A2C4D5E6F"
+                    },
+                    "name": {
+                        "type": "string",
+                        "example": "St Ive's"
+                    },
+                    "slug": {
+                        "type": "string",
+                        "example": "st-ives"
+                    }
+                },
+                "type": "object"
+            },
+            "Categories": {
+                "properties": {
+                    "id": {
+                        "type": "string",
+                        "example": "01J2P9WQZ3YJ6R8X9A2C4D5E6F"
+                    },
+                    "name": {
+                        "type": "string",
+                        "example": "Skin Care"
+                    },
+                    "parent": {
+                        "$ref": "#/components/schemas/parentCategory"
+                    },
+                    "slug": {
+                        "type": "string",
+                        "example": "skin-care"
+                    },
+                    "description": {
+                        "type": "string",
+                        "example": "A long lipsium ipsium description",
+                        "nullable": true
+                    },
+                    "metaTitle": {
+                        "type": "string",
+                        "example": "A long lipsium ipsium description",
+                        "nullable": true
+                    },
+                    "metaDescription": {
+                        "type": "string",
+                        "example": "A long lipsium ipsium description",
+                        "nullable": true
+                    },
+                    "sortOrder": {
+                        "type": "integer",
+                        "example": 4,
+                        "nullable": true
+                    },
+                    "isActive": {
+                        "type": "boolean",
+                        "example": true
+                    }
+                },
+                "type": "object"
+            },
+            "parentCategory": {
+                "properties": {
+                    "id": {
+                        "type": "string",
+                        "example": "01J2P9WQZ3YJ6R8X9A2C4D5E6F",
+                        "nullable": true
+                    },
+                    "name": {
+                        "type": "string",
+                        "example": "Skin Care",
+                        "nullable": true
+                    },
+                    "slug": {
+                        "type": "string",
+                        "example": "skin-care",
+                        "nullable": true
+                    }
+                },
+                "type": "object"
+            },
+            "ProductCatalog": {
+                "title": "Product Catalog",
+                "properties": {
+                    "id": {
+                        "type": "string",
+                        "example": "01J2P9WQZ3YJ6R8X9A2C4D5E6F"
+                    },
+                    "name": {
+                        "type": "string",
+                        "example": "Face Scrub"
+                    },
+                    "slug": {
+                        "type": "string",
+                        "example": "face-scrub",
+                        "nullable": true
+                    },
+                    "category": {
+                        "$ref": "#/components/schemas/Categories"
+                    },
+                    "brand": {
+                        "$ref": "#/components/schemas/Brands"
+                    },
+                    "shortDescription": {
+                        "type": "string",
+                        "example": "Facial scrub lemon fragrance ",
+                        "nullable": true
+                    },
+                    "description": {
+                        "type": "string",
+                        "example": "Facial scrub lemon fragrance with very much more additional info",
+                        "nullable": true
+                    },
+                    "type": {
+                        "example": "variant"
+                    },
+                    "metaTitle": {
+                        "type": "string",
+                        "example": "Facial scrub lemon fragrance",
+                        "nullable": true
+                    },
+                    "metaDescription": {
+                        "type": "string",
+                        "example": "Facial scrub lemon fragrance with very much more additional info",
+                        "nullable": true
+                    },
+                    "isFeatured": {
+                        "type": "boolean",
+                        "example": "true"
+                    },
+                    "price": {
+                        "$ref": "#/components/schemas/Price"
+                    }
+                },
+                "type": "object"
+            },
+            "ProductCatalogFilters": {
+                "properties": {
+                    "search": {
+                        "description": "Search across product name and slug",
+                        "type": "string",
+                        "example": "bathing salts",
+                        "nullable": true
+                    }
+                },
+                "type": "object"
+            },
+            "ProductCatalogResponse": {
+                "properties": {
+                    "data": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/ProductCatalog"
+                        }
+                    },
+                    "meta": {
+                        "$ref": "#/components/schemas/PaginationMeta"
+                    }
+                },
+                "type": "object"
+            },
+            "ProductDetail": {
+                "title": "Product Detail",
+                "properties": {
+                    "id": {
+                        "type": "string",
+                        "example": "01J2P9WQZ3YJ6R8X9A2C4D5E6F"
+                    },
+                    "name": {
+                        "type": "string",
+                        "example": "Face Scrub"
+                    },
+                    "slug": {
+                        "type": "string",
+                        "example": "face-scrub"
+                    },
+                    "category": {
+                        "$ref": "#/components/schemas/Categories"
+                    },
+                    "brand": {
+                        "$ref": "#/components/schemas/Brands"
+                    },
+                    "shortDescription": {
+                        "type": "string",
+                        "example": "Facial scrub lemon fragrance ",
+                        "nullable": true
+                    },
+                    "description": {
+                        "type": "string",
+                        "example": "Facial scrub lemon fragrance with very much more additional info",
+                        "nullable": true
+                    },
+                    "type": {
+                        "example": "variant"
+                    },
+                    "status": {
+                        "example": "published"
+                    },
+                    "metaTitle": {
+                        "type": "string",
+                        "example": "facial scrub",
+                        "nullable": true
+                    },
+                    "metaDescription": {
+                        "type": "string",
+                        "example": "very long facial scrub",
+                        "nullable": true
+                    },
+                    "isFeatured": {
+                        "type": "boolean",
+                        "example": "false"
+                    },
+                    "variants": {
+                        "$ref": "#/components/schemas/Variants"
+                    },
+                    "price": {
+                        "$ref": "#/components/schemas/Price"
+                    }
+                },
+                "type": "object"
+            },
+            "Variants": {
+                "properties": {
+                    "id": {
+                        "type": "string",
+                        "example": "01J2P9WQZ3YJ6R8X9A2C4D5E6F"
+                    },
+                    "productId": {
+                        "type": "string",
+                        "example": "01J2P9WQZ3YJ6R8X9A2C4D5E6F"
+                    },
+                    "sku": {
+                        "type": "string",
+                        "example": "FACE-SCRUB-LEM-099009"
+                    },
+                    "isDefault": {
+                        "type": "boolean",
+                        "example": "false"
+                    },
+                    "price": {
+                        "$ref": "#/components/schemas/Price"
+                    },
+                    "salePrice": {
+                        "$ref": "#/components/schemas/Price"
+                    },
+                    "saleStartsAt": {
+                        "type": "string",
+                        "format": "date-time",
+                        "example": "2025-01-01T00:00:00.000000Z"
+                    },
+                    "saleEndsAt": {
+                        "type": "string",
+                        "format": "date-time",
+                        "example": "2025-03-01T00:00:00.000000Z"
+                    },
+                    "manageStock": {
+                        "type": "boolean",
+                        "example": true
+                    },
+                    "stockQuantity": {
+                        "type": "integer",
+                        "example": 10
+                    },
+                    "inStock": {
+                        "type": "boolean",
+                        "example": true
+                    },
+                    "attributes": {
+                        "type": "array",
+                        "items": {
+                            "type": "mixed"
+                        },
+                        "example": "[{'color': 'red', 'size': 'large'}]"
+                    },
+                    "sortOrder": {
+                        "type": "integer",
+                        "example": 1
+                    },
+                    "status": {
+                        "type": "string",
+                        "example": "active"
+                    }
+                },
+                "type": "object"
+            },
+            "PaginationMeta": {
+                "properties": {
+                    "currentPage": {
+                        "type": "integer",
+                        "example": 1
+                    },
+                    "perPage": {
+                        "type": "integer",
+                        "example": 20
+                    },
+                    "total": {
+                        "type": "integer",
+                        "example": 120
+                    }
+                },
+                "type": "object"
+            },
+            "Price": {
+                "properties": {
+                    "amount": {
+                        "type": "integer",
+                        "example": 1000
+                    },
+                    "currency": {
+                        "type": "string",
+                        "example": "NGN"
+                    },
+                    "saleAmount": {
+                        "type": "integer",
+                        "example": "800",
+                        "nullable": true
+                    },
+                    "onSale": {
+                        "type": "boolean",
+                        "example": "true"
+                    }
+                },
+                "type": "object"
+            }
+        }
+    },
+    "tags": [
+        {
+            "name": "Categories",
+            "description": "Categories"
+        },
+        {
+            "name": "Products",
+            "description": "Products"
+        }
+    ]
+}
