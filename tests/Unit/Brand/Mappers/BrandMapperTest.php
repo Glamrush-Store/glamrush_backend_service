@@ -5,8 +5,8 @@
  * See the LICENSE file for details.
  */
 
-use App\Features\Brand\DTOs\BrandDto;
-use App\Features\Brand\Mappers\BrandDtoMapper;
+use App\Domain\Catalog\Brand\DTOs\BrandDto;
+use App\Domain\Catalog\Brand\Mappers\BrandDtoMapper;
 use Tests\Support\Factories\BrandFactory;
 
 it('maps brand model to brand dto correctly', function () {
