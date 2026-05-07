@@ -8,20 +8,27 @@ use App\Presentation\Http\Controllers\Auth\RegisterController;
 use App\Presentation\Http\Controllers\Auth\ResetPasswordController;
 use App\Presentation\Http\Controllers\Auth\SocialCallbackController;
 use App\Presentation\Http\Controllers\Auth\VerifyPasswordCodeController;
+use App\Presentation\Http\Controllers\Catalog\AddSavedItemController;
 use App\Presentation\Http\Controllers\Catalog\AddToCartController;
 use App\Presentation\Http\Controllers\Catalog\ClearCartController;
 use App\Presentation\Http\Controllers\Catalog\GetCartController;
-use App\Presentation\Http\Controllers\Catalog\MergeCartController;
-use App\Presentation\Http\Controllers\Catalog\RemoveCartItemController;
-use App\Presentation\Http\Controllers\Catalog\UpdateCartItemController;
 use App\Presentation\Http\Controllers\Catalog\GetProductController;
-use App\Presentation\Http\Controllers\Catalog\AddSavedItemController;
 use App\Presentation\Http\Controllers\Catalog\ListBrandController;
 use App\Presentation\Http\Controllers\Catalog\ListCategoryController;
 use App\Presentation\Http\Controllers\Catalog\ListProductController;
 use App\Presentation\Http\Controllers\Catalog\ListSavedItemsController;
+use App\Presentation\Http\Controllers\Catalog\MergeCartController;
+use App\Presentation\Http\Controllers\Catalog\RemoveCartItemController;
 use App\Presentation\Http\Controllers\Catalog\RemoveSavedItemController;
 use App\Presentation\Http\Controllers\Catalog\SyncSavedItemsController;
+use App\Presentation\Http\Controllers\Catalog\UpdateCartItemController;
+use App\Presentation\Http\Controllers\Customer\DeleteAddressController;
+use App\Presentation\Http\Controllers\Customer\ListAddressesController;
+use App\Presentation\Http\Controllers\Customer\SetDefaultAddressController;
+use App\Presentation\Http\Controllers\Customer\ShowAddressController;
+use App\Presentation\Http\Controllers\Customer\StoreAddressController;
+use App\Presentation\Http\Controllers\Customer\UpdateAddressController;
+use App\Presentation\Http\Controllers\Shipping\GetShippingOptionsController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
@@ -87,6 +94,20 @@ Route::prefix('v1')->group(function () {
         Route::post('/', AddSavedItemController::class);
         Route::post('/sync', SyncSavedItemsController::class);
         Route::delete('/{productId}', RemoveSavedItemController::class);
+    });
+
+    // Customer Addresses
+    Route::middleware('auth:sanctum')->prefix('addresses')->group(function () {
+        Route::get('/', ListAddressesController::class);
+        Route::post('/', StoreAddressController::class);
+        Route::get('/{address}', ShowAddressController::class);
+        Route::patch('/{address}', UpdateAddressController::class);
+        Route::delete('/{address}', DeleteAddressController::class);
+        Route::patch('/{address}/default', SetDefaultAddressController::class);
+    });
+
+    Route::prefix('shipping')->group(function () {
+        Route::post('/getoptions', GetShippingOptionsController::class);
     });
 });
 
