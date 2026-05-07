@@ -2,8 +2,8 @@
 
 namespace Tests\Support\Factories;
 
-use App\Features\Product\Enums\ProductStatus;
-use App\Features\Product\Enums\ProductType;
+use App\Domain\Catalog\Product\Enums\ProductStatus;
+use App\Domain\Catalog\Product\Enums\ProductType;
 use App\Infrastructure\Persistence\Eloquent\Models\Product;
 use App\Shared\DTOs\PriceDto;
 use Illuminate\Support\Collection;
