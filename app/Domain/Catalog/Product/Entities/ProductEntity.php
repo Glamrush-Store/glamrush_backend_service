@@ -16,6 +16,7 @@ use DateTimeImmutable;
 final class ProductEntity
 {
     public function __construct(
+        public readonly string $id,
         public readonly string $name,
         public readonly string $slug,
         public readonly ?string $sku,
@@ -26,12 +27,12 @@ final class ProductEntity
         public readonly ?CategoryEntity $category,
         public readonly ?BrandEntity $brand,
         public readonly array $images = [],
-        private float $price,
+        public float $price,
         private ?float $salePrice,
         private ?string $saleStartsAt,
         private ?string $saleEndsAt,
         private bool $manageStock,
-        private int $stockQuantity,
+        public int $stockQuantity,
         private bool $inStock,
         private array $variants = [],
     ) {
@@ -44,6 +45,9 @@ final class ProductEntity
 // correct
     public function effectivePrice(DateTimeImmutable $now): float
     {
+        if (!$this->isOnSale($now)) {
+            return $this->price;
+        }
         if (
             $this->salePrice &&
             $this->saleStartsAt &&
@@ -53,8 +57,6 @@ final class ProductEntity
         ) {
             return $this->salePrice;
         }
-
-        return $this->price;
     }
 
     public function isOnSale(DateTimeImmutable $now): bool
@@ -72,6 +74,15 @@ final class ProductEntity
     public function defaultAttributes(): array
     {
         return $this->defaultVariant()?->attributes() ?? [];
+    }
+
+    public function displayDefaultAttributes(): array
+    {
+        if (!$this->isVariable()) {
+            return [];
+        }
+
+        return $this->defaultAttributes();
     }
 
     public function defaultVariant(): ?ProductVariantEntity
@@ -112,6 +123,15 @@ final class ProductEntity
 
     public function variants(): array
     {
+        return $this->variants;
+    }
+
+    public function displayVariants(): array
+    {
+        if (!$this->isVariable()) {
+            return [];
+        }
+
         return $this->variants;
     }
 }

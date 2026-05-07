@@ -5,6 +5,7 @@ namespace App\Presentation\Http\Controllers\Auth;
 use App\Domain\User\Services\AuthService;
 use App\Presentation\Http\Requests\Auth\LoginRequest;
 use App\Presentation\Http\Resources\Auth\UserResource;
+use App\Presentation\Http\Responses\ApiResponse;
 use Illuminate\Http\JsonResponse;
 
 final class LoginController
@@ -19,12 +20,12 @@ final class LoginController
         );
 
         if (! $result) {
-            return response()->json(['message' => 'Invalid credentials.'], 401);
+            return ApiResponse::error('Invalid credentials.', [], 401);
         }
 
-        return response()->json([
+        return ApiResponse::success([
             'token' => $result['token'],
             'user' => new UserResource($result['user']),
-        ]);
+        ], 'Login successful.');
     }
 }

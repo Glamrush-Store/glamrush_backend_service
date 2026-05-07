@@ -10,6 +10,8 @@ namespace App\Presentation\Http\Controllers\Catalog;
 use App\Domain\Catalog\Product\Queries\GetProductQuery;
 use App\Domain\Catalog\Product\Services\CatalogService;
 use App\Presentation\Http\Resources\Catalog\ProductResource;
+use App\Presentation\Http\Responses\ApiResponse;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
 final class GetProductController
@@ -20,7 +22,7 @@ final class GetProductController
     ) {
     }
 
-    public function __invoke(string $slug, Request $request): ProductResource
+    public function __invoke(string $slug, Request $request): JsonResponse
     {
         $query = new GetProductQuery(
             slug: $slug
@@ -29,6 +31,6 @@ final class GetProductController
 
         $product = $this->catalogService->getProduct($query);
 
-        return new ProductResource($product);
+        return ApiResponse::success(new ProductResource($product));
     }
 }

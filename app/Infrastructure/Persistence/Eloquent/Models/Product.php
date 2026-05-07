@@ -37,6 +37,9 @@ class Product extends Model implements HasMedia
         'sort_order',
         'category_id',
         'brand_id',
+        'manage_stock',
+        'stock_quantity',
+        'in_stock',
     ];
     protected $keyType = 'string';
 

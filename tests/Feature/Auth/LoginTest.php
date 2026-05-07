@@ -1,6 +1,6 @@
 <?php
 
-use App\Models\User;
+use App\Infrastructure\Persistence\Eloquent\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 
 uses(RefreshDatabase::class);
@@ -19,8 +19,7 @@ test('user can login with correct credentials', function () {
 
     $response->assertStatus(200)
         ->assertJsonStructure([
-            'token',
-            'user' => ['id', 'name', 'email', 'phone', 'created_at'],
+            'data' => ['token', 'user' => ['id', 'name', 'email', 'phone', 'created_at']],
         ]);
 });
 

@@ -21,7 +21,7 @@ final class ProductVariantEntity
         private ?DateTimeImmutable $saleStartsAt,
         private ?DateTimeImmutable $saleEndsAt,
         private bool $manageStock,
-        private int $stockQuantity,
+        public int $stockQuantity,
         private bool $inStock,
         private array $attributes,
         private int $sortOrder,

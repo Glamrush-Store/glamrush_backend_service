@@ -4,6 +4,7 @@ namespace App\Presentation\Http\Controllers\Auth;
 
 use App\Domain\User\Services\PasswordService;
 use App\Presentation\Http\Requests\Auth\ResetPasswordRequest;
+use App\Presentation\Http\Responses\ApiResponse;
 use Illuminate\Http\JsonResponse;
 
 final class ResetPasswordController
@@ -17,6 +18,6 @@ final class ResetPasswordController
             $request->validated('password'),
         );
 
-        return response()->json(['message' => 'Password has been reset successfully.']);
+        return ApiResponse::success(null, 'Password has been reset successfully.');
     }
 }

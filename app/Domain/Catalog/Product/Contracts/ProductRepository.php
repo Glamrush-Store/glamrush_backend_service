@@ -17,4 +17,6 @@ interface ProductRepository
 
     public function paginate(ListProductsQuery $query): LengthAwarePaginator;
 
+    public function getFacets(ListProductsQuery $query): array;
+
 }

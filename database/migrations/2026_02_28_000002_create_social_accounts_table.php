@@ -10,7 +10,7 @@ return new class extends Migration
     {
         Schema::create('social_accounts', function (Blueprint $table) {
             $table->id();
-            $table->foreignId('user_id')->constrained()->cascadeOnDelete();
+            $table->foreignId('user_id')->constrained('customer_accounts')->cascadeOnDelete();
             $table->string('provider');
             $table->string('provider_user_id');
             $table->text('access_token');

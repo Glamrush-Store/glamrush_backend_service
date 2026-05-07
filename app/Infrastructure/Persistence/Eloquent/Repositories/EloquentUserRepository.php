@@ -5,7 +5,7 @@ namespace App\Infrastructure\Persistence\Eloquent\Repositories;
 use App\Domain\User\Contracts\UserRepository;
 use App\Domain\User\Entities\UserEntity;
 use App\Infrastructure\Persistence\Eloquent\Mappers\UserMapper;
-use App\Models\User;
+use App\Infrastructure\Persistence\Eloquent\Models\User;
 
 final class EloquentUserRepository implements UserRepository
 {

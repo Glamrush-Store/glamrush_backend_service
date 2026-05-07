@@ -1,6 +1,6 @@
 <?php
 
-use App\Models\User;
+use App\Infrastructure\Persistence\Eloquent\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Laravel\Sanctum\Sanctum;
 

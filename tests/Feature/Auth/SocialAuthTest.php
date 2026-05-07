@@ -1,7 +1,8 @@
 <?php
 
-use App\Models\User;
+use App\Infrastructure\Persistence\Eloquent\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Laravel\Socialite\Contracts\Provider;
 use Laravel\Socialite\Facades\Socialite;
 
 uses(RefreshDatabase::class);
@@ -21,7 +22,7 @@ function makeSocialUser(string $id, string $name, string $email): object
 
 function mockSocialiteDriver(object $socialUser): void
 {
-    $provider = Mockery::mock(\Laravel\Socialite\Contracts\Provider::class);
+    $provider = Mockery::mock(Provider::class);
     $provider->shouldReceive('userFromToken')->andReturn($socialUser);
 
     Socialite::shouldReceive('driver')->with('google')->andReturn($provider);
@@ -37,8 +38,7 @@ test('new social user is created and receives token', function () {
 
     $response->assertStatus(201)
         ->assertJsonStructure([
-            'token',
-            'user' => ['id', 'name', 'email', 'phone', 'created_at'],
+            'data' => ['token', 'user' => ['id', 'name', 'email', 'phone', 'created_at']],
         ]);
 
     expect(User::where('email', 'social@example.com')->exists())->toBeTrue();
@@ -80,14 +80,14 @@ test('existing user by email gets social account linked', function () {
     ]);
 
     $response->assertStatus(201)
-        ->assertJsonPath('user.email', 'social@example.com');
+        ->assertJsonPath('data.user.email', 'social@example.com');
 
     expect(User::where('email', 'social@example.com')->count())->toBe(1);
 });
 
 test('invalid social token returns 422', function () {
-    $provider = Mockery::mock(\Laravel\Socialite\Contracts\Provider::class);
-    $provider->shouldReceive('userFromToken')->andThrow(new \Exception('Invalid token'));
+    $provider = Mockery::mock(Provider::class);
+    $provider->shouldReceive('userFromToken')->andThrow(new Exception('Invalid token'));
 
     Socialite::shouldReceive('driver')->with('google')->andReturn($provider);
 

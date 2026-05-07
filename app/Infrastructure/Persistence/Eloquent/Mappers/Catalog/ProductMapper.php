@@ -20,9 +20,10 @@ final class ProductMapper
     public static function toDomain(Product $model): ProductEntity
     {
         return new ProductEntity(
+            id: $model->id,
             name: $model->name,
             slug: $model->slug,
-            sku: $model->sku,
+            sku: self::mapSku($model),
             type: $model->type,
             isFeatured: (bool)$model->is_featured,
             sortOrder: (int)$model->sort_order,
@@ -62,6 +63,22 @@ final class ProductMapper
             name: $model->vendor->name,
             slug: $model->vendor->slug,
         );
+    }
+
+    private static function mapSku(Product $model): ?string
+    {
+        if ($model->sku) {
+            return $model->sku;
+        }
+
+        if ($model->type !== 'simple' || !$model->relationLoaded('variants')) {
+            return null;
+        }
+
+        $variant = $model->variants->firstWhere('is_default', true)
+            ?? $model->variants->first();
+
+        return $variant?->sku;
     }
 
     private static function mapCategory($model): ?CategoryEntity

@@ -1,6 +1,6 @@
 <?php
 
-use App\Models\User;
+use App\Infrastructure\Persistence\Eloquent\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 
 uses(RefreshDatabase::class);
@@ -15,10 +15,9 @@ test('user can register with valid data', function () {
 
     $response->assertStatus(201)
         ->assertJsonStructure([
-            'token',
-            'user' => ['id', 'name', 'email', 'phone', 'created_at'],
+            'data' => ['token', 'user' => ['id', 'name', 'email', 'phone', 'created_at']],
         ])
-        ->assertJsonPath('user.email', 'test@example.com');
+        ->assertJsonPath('data.user.email', 'test@example.com');
 
     expect(User::where('email', 'test@example.com')->exists())->toBeTrue();
 });
@@ -33,7 +32,7 @@ test('user can register with optional phone', function () {
     ]);
 
     $response->assertStatus(201)
-        ->assertJsonPath('user.phone', '+1234567890');
+        ->assertJsonPath('data.user.phone', '+1234567890');
 });
 
 test('registration fails with duplicate email', function () {

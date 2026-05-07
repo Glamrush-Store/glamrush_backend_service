@@ -2,7 +2,7 @@
 
 namespace App\Domain\User\Contracts;
 
-use App\Models\User;
+use App\Infrastructure\Persistence\Eloquent\Models\User;
 use Laravel\Socialite\Contracts\User as SocialUser;
 
 interface SocialAccountRepository

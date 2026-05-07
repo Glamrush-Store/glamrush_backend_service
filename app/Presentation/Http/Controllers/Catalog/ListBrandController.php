@@ -11,6 +11,8 @@ namespace App\Presentation\Http\Controllers\Catalog;
 use App\Domain\Catalog\Brand\Queries\ListBrandQuery;
 use App\Domain\Catalog\Brand\Services\BrandService;
 use App\Presentation\Http\Resources\Catalog\BrandResource;
+use App\Presentation\Http\Responses\ApiResponse;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
 final class ListBrandController
@@ -21,7 +23,7 @@ final class ListBrandController
     ) {
     }
 
-    public function __invoke(Request $request)
+    public function __invoke(Request $request): JsonResponse
     {
         $query = new ListBrandQuery(
             search: $request->filled('search') ? $request->string('search') : null,
@@ -30,6 +32,6 @@ final class ListBrandController
 
         $brands = $this->brandService->getBrandList($query);
 
-        return BrandResource::collection($brands);
+        return ApiResponse::success(BrandResource::collection($brands));
     }
 }

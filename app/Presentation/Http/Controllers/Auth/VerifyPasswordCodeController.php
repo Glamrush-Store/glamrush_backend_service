@@ -4,6 +4,7 @@ namespace App\Presentation\Http\Controllers\Auth;
 
 use App\Domain\User\Services\PasswordService;
 use App\Presentation\Http\Requests\Auth\VerifyPasswordCodeRequest;
+use App\Presentation\Http\Responses\ApiResponse;
 use Illuminate\Http\JsonResponse;
 
 final class VerifyPasswordCodeController
@@ -17,6 +18,6 @@ final class VerifyPasswordCodeController
             $request->validated('code'),
         );
 
-        return response()->json(['message' => 'Code verified successfully.']);
+        return ApiResponse::success(null, 'Code verified successfully.');
     }
 }

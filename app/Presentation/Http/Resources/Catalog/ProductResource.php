@@ -17,19 +17,20 @@ class ProductResource extends JsonResource
     {
         $now = new DateTimeImmutable();
         return [
+            'id' => $this->id,
             'name' => $this->name,
             'slug' => $this->slug,
             'sku' => $this->sku,
             'type' => $this->type,
             'isOnSale' => $this->isOnSale($now),
 
-            'price' => $this->effectivePrice($now),
+            // 'price' => $this->effectivePrice($now),
+            'price' => $this->price,
+            'stock_quantity' => $this->stockQuantity,
             'available' => $this->isAvailable(),
 
             'is_featured' => $this->isFeatured,
             'sort_order' => $this->sortOrder,
-
-
             'images' => $this->images,
 
             'category' => $this->category
@@ -48,23 +49,24 @@ class ProductResource extends JsonResource
                 ]
                 : null,
 
-            'default_attributes' => $this->defaultAttributes(),
+            'default_attributes' => $this->displayDefaultAttributes(),
 
-            'variants' => $this->variants()
+            'variants' => $this->displayVariants()
                 ? array_map(function ($variant) use ($now) {
                     return [
                         'id' => $variant->id,
                         'sku' => $variant->sku,
                         'images' => $variant->images,
                         'isDefault' => $variant->isDefault(),
-                        'price' => $variant->effectivePrice($now),
+                        'price' => $variant->price,
                         'salePrice' => $variant->salePrice,
+                        'stock_quantity' => $variant->stockQuantity,
                         'inStock' => $variant->isAvailable(),
                         'isOnSale' => $variant->isOnSale($now),
                         'available' => $variant->isAvailable(),
                         'attributes' => $variant->attributes(),
                     ];
-                }, $this->variants())
+                }, $this->displayVariants())
                 : [],
         ];
     }

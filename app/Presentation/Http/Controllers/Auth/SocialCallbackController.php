@@ -4,6 +4,7 @@ namespace App\Presentation\Http\Controllers\Auth;
 
 use App\Domain\User\Services\AuthService;
 use App\Presentation\Http\Resources\Auth\UserResource;
+use App\Presentation\Http\Responses\ApiResponse;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\ValidationException;
@@ -26,9 +27,9 @@ final class SocialCallbackController
             ]);
         }
 
-        return response()->json([
+        return ApiResponse::success([
             'token' => $result['token'],
             'user' => new UserResource($result['user']),
-        ], 201);
+        ], 'Authenticated successfully.', 201);
     }
 }

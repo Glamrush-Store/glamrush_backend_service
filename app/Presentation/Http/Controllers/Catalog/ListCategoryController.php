@@ -11,6 +11,8 @@ namespace App\Presentation\Http\Controllers\Catalog;
 use App\Domain\Catalog\Category\Queries\ListCategoryQuery;
 use App\Domain\Catalog\Category\Services\CategoryService;
 use App\Presentation\Http\Resources\Catalog\CategoryResource;
+use App\Presentation\Http\Responses\ApiResponse;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
 final class ListCategoryController
@@ -21,15 +23,15 @@ final class ListCategoryController
     ) {
     }
 
-    public function __invoke(Request $request)
+    public function __invoke(Request $request): JsonResponse
     {
         $query = new ListCategoryQuery(
             deep: !$request->filled('deep') || $request->boolean('deep'),
         );
-        
+
 
         $category = $this->categoryService->getCategoryList($query);
 
-        return CategoryResource::collection($category);
+        return ApiResponse::success(CategoryResource::collection($category));
     }
 }

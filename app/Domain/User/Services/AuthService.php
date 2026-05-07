@@ -5,8 +5,9 @@ namespace App\Domain\User\Services;
 use App\Domain\User\Contracts\SocialAccountRepository;
 use App\Domain\User\Contracts\UserRepository;
 use App\Domain\User\Entities\UserEntity;
-use App\Models\User;
+use App\Infrastructure\Persistence\Eloquent\Models\User;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Str;
 use Laravel\Socialite\Facades\Socialite;
 
 final class AuthService
@@ -14,7 +15,8 @@ final class AuthService
     public function __construct(
         private readonly UserRepository $userRepository,
         private readonly SocialAccountRepository $socialAccountRepository,
-    ) {}
+    ) {
+    }
 
     /**
      * @return array{user: UserEntity, token: string}
@@ -35,7 +37,7 @@ final class AuthService
     {
         $user = User::where('email', $email)->first();
 
-        if (! $user || ! Hash::check($password, $user->password)) {
+        if (!$user || !Hash::check($password, $user->password)) {
             return null;
         }
 
@@ -60,7 +62,7 @@ final class AuthService
         $existingUser = $this->socialAccountRepository->findByProvider($provider, $socialUser->getId());
 
         if ($existingUser) {
-            $userEntity = $this->userRepository->findById((string) $existingUser->id);
+            $userEntity = $this->userRepository->findById((string)$existingUser->id);
             $token = $existingUser->createToken('api')->plainTextToken;
 
             return ['user' => $userEntity, 'token' => $token];
@@ -68,15 +70,15 @@ final class AuthService
 
         $userByEmail = User::where('email', $socialUser->getEmail())->first();
 
-        if (! $userByEmail) {
+        if (!$userByEmail) {
             $userEntity = $this->userRepository->create([
                 'name' => $socialUser->getName() ?? $socialUser->getNickname() ?? 'User',
                 'email' => $socialUser->getEmail(),
-                'password' => \Illuminate\Support\Str::random(32),
+                'password' => Str::random(32),
             ]);
             $userByEmail = User::findOrFail($userEntity->id);
         } else {
-            $userEntity = $this->userRepository->findById((string) $userByEmail->id);
+            $userEntity = $this->userRepository->findById((string)$userByEmail->id);
         }
 
         $this->socialAccountRepository->createForUser($userByEmail, $provider, $socialUser);

@@ -3,7 +3,7 @@
 namespace App\Domain\User\Services;
 
 use App\Domain\User\Notifications\PasswordResetCodeNotification;
-use App\Models\User;
+use App\Infrastructure\Persistence\Eloquent\Models\User;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
@@ -15,12 +15,12 @@ final class PasswordService
     {
         $user = User::where('email', $email)->first();
 
-        if (! $user) {
+        if (!$user) {
             // No email enumeration — silently return
             return;
         }
 
-        $code = (string) random_int(100000, 999999);
+        $code = (string)random_int(100000, 999999);
 
         DB::table('password_reset_codes')->upsert(
             [
@@ -43,8 +43,8 @@ final class PasswordService
         $record = DB::table('password_reset_codes')->where('email', $email)->first();
 
         if (
-            ! $record
-            || ! Hash::check($code, $record->code)
+            !$record
+            || !Hash::check($code, $record->code)
             || Carbon::parse($record->expires_at)->isPast()
         ) {
             throw ValidationException::withMessages([
@@ -64,7 +64,7 @@ final class PasswordService
             ->where('verified', true)
             ->first();
 
-        if (! $record) {
+        if (!$record) {
             throw ValidationException::withMessages([
                 'email' => ['Password reset has not been verified for this email.'],
             ]);

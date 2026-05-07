@@ -3,18 +3,19 @@
 namespace App\Infrastructure\Persistence\Eloquent\Mappers;
 
 use App\Domain\User\Entities\UserEntity;
-use App\Models\User;
+use App\Infrastructure\Persistence\Eloquent\Models\User;
+use DateTimeImmutable;
 
 final class UserMapper
 {
     public static function toDomain(User $model): UserEntity
     {
         return new UserEntity(
-            id: (string) $model->id,
+            id: (string)$model->id,
             name: $model->name,
             email: $model->email,
             phone: $model->phone,
-            createdAt: \DateTimeImmutable::createFromInterface($model->created_at),
+            createdAt: DateTimeImmutable::createFromInterface($model->created_at),
         );
     }
 }

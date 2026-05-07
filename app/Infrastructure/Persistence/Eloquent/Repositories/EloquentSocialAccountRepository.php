@@ -4,7 +4,7 @@ namespace App\Infrastructure\Persistence\Eloquent\Repositories;
 
 use App\Domain\User\Contracts\SocialAccountRepository;
 use App\Infrastructure\Persistence\Eloquent\Models\SocialAccount;
-use App\Models\User;
+use App\Infrastructure\Persistence\Eloquent\Models\User;
 use Laravel\Socialite\Contracts\User as SocialUser;
 
 final class EloquentSocialAccountRepository implements SocialAccountRepository

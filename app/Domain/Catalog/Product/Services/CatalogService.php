@@ -10,6 +10,7 @@ namespace App\Domain\Catalog\Product\Services;
 use App\Domain\Catalog\Product\Contracts\ProductRepository;
 use App\Domain\Catalog\Product\Entities\ProductEntity;
 use App\Domain\Catalog\Product\Queries\GetProductQuery;
+use App\Domain\Catalog\Product\Queries\ListFacetsQuery;
 use App\Domain\Catalog\Product\Queries\ListProductsQuery;
 use App\Infrastructure\Caching\QueryCache;
 use Illuminate\Pagination\LengthAwarePaginator;
@@ -40,6 +41,13 @@ final class CatalogService
     ): LengthAwarePaginator {
         return QueryCache::remember($query, function () use ($query) {
             return $this->products->paginate($query);
+        });
+    }
+
+    public function getFacets(ListProductsQuery $query): array
+    {
+        return QueryCache::remember(new ListFacetsQuery($query), function () use ($query) {
+            return $this->products->getFacets($query);
         });
     }
 

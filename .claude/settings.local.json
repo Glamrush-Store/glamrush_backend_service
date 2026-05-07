@@ -3,7 +3,10 @@
     "allow": [
       "Bash(php artisan list:*)",
       "Bash(composer require:*)",
-      "Bash(vendor/bin/pest:*)"
+      "Bash(vendor/bin/pest:*)",
+      "Bash(node:*)",
+      "Bash(php artisan:*)",
+      "Bash(composer dump-autoload:*)"
     ]
   }
 }
