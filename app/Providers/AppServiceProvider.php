@@ -7,17 +7,21 @@ use App\Domain\Catalog\Cart\Contracts\CartRepository;
 use App\Domain\Catalog\Category\Contracts\CategoryRepository;
 use App\Domain\Catalog\Product\Contracts\ProductRepository;
 use App\Domain\Catalog\SavedItem\Contracts\SavedItemRepository;
+use App\Domain\Shipping\Contracts\ShippingRepository;
+use App\Domain\User\Contracts\AddressRepository;
 use App\Domain\User\Contracts\SocialAccountRepository;
 use App\Domain\User\Contracts\UserRepository;
 use App\Infrastructure\Persistence\Eloquent\Models\Category;
 use App\Infrastructure\Persistence\Eloquent\Models\Product;
 use App\Infrastructure\Persistence\Eloquent\Models\ProductVariant;
 use App\Infrastructure\Persistence\Eloquent\Models\User;
+use App\Infrastructure\Persistence\Eloquent\Repositories\EloquentAddressRepository;
 use App\Infrastructure\Persistence\Eloquent\Repositories\EloquentBrandRepository;
 use App\Infrastructure\Persistence\Eloquent\Repositories\EloquentCartRepository;
 use App\Infrastructure\Persistence\Eloquent\Repositories\EloquentCategoryRepository;
 use App\Infrastructure\Persistence\Eloquent\Repositories\EloquentProductRepository;
 use App\Infrastructure\Persistence\Eloquent\Repositories\EloquentSavedItemRepository;
+use App\Infrastructure\Persistence\Eloquent\Repositories\EloquentShippingRepository;
 use App\Infrastructure\Persistence\Eloquent\Repositories\EloquentSocialAccountRepository;
 use App\Infrastructure\Persistence\Eloquent\Repositories\EloquentUserRepository;
 use Illuminate\Database\Eloquent\Relations\Relation;
@@ -62,6 +66,16 @@ class AppServiceProvider extends ServiceProvider
         $this->app->bind(
             CartRepository::class,
             EloquentCartRepository::class,
+        );
+
+        $this->app->bind(
+            AddressRepository::class,
+            EloquentAddressRepository::class,
+        );
+
+        $this->app->bind(
+            ShippingRepository::class,
+            EloquentShippingRepository::class,
         );
     }
 

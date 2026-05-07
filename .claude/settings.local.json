@@ -6,7 +6,14 @@
       "Bash(vendor/bin/pest:*)",
       "Bash(node:*)",
       "Bash(php artisan:*)",
-      "Bash(composer dump-autoload:*)"
+      "Bash(composer dump-autoload:*)",
+      "Bash(Get-ChildItem -Path \"C:\\\\Users\\\\USER\\\\PhpstormProjects\\\\glamrush_backend_service\\\\app\\\\Domain\" -Directory -ErrorAction SilentlyContinue)",
+      "Bash(Select-Object Name)",
+      "PowerShell(Get-ChildItem \"C:\\\\Users\\\\USER\\\\PhpstormProjects\\\\glamrush_backend_service\\\\app\\\\Domain\" | Where-Object { $_.PSIsContainer } | ForEach-Object { $_.Name })",
+      "PowerShell(Get-ChildItem \"C:\\\\Users\\\\USER\\\\PhpstormProjects\\\\glamrush_backend_service\\\\app\\\\Presentation\\\\Http\\\\Controllers\" | Where-Object { $_.PSIsContainer } | ForEach-Object { $_.Name })",
+      "PowerShell(Get-ChildItem \"C:\\\\Users\\\\USER\\\\PhpstormProjects\\\\glamrush_backend_service\\\\app\\\\Presentation\\\\Http\\\\Resources\" | Where-Object { $_.PSIsContainer } | ForEach-Object { $_.Name })",
+      "PowerShell(Get-ChildItem \"C:\\\\Users\\\\USER\\\\PhpstormProjects\\\\glamrush_backend_service\\\\app\\\\Domain\\\\Catalog\" | Where-Object { $_.PSIsContainer } | ForEach-Object { $_.Name })",
+      "PowerShell(Get-ChildItem \"C:\\\\Users\\\\USER\\\\PhpstormProjects\\\\glamrush_backend_service\\\\app\" | Where-Object { $_.PSIsContainer } | ForEach-Object { $_.Name })"
     ]
   }
 }
