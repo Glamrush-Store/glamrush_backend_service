@@ -18,6 +18,10 @@ beforeEach(function () {
         $table->string('status')->default('draft');
         $table->timestamp('published_at')->nullable();
         $table->string('type')->default('simple');
+        $table->decimal('price', 10, 2)->default(0);
+        $table->decimal('sale_price', 10, 2)->nullable();
+        $table->timestamp('sale_starts_at')->nullable();
+        $table->timestamp('sale_ends_at')->nullable();
         $table->boolean('manage_stock')->default(false);
         $table->integer('stock_quantity')->default(0);
         $table->boolean('in_stock')->default(true);

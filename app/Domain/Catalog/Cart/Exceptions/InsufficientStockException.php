@@ -6,8 +6,9 @@ use RuntimeException;
 
 final class InsufficientStockException extends RuntimeException
 {
-    public function __construct(int $available)
+    public function __construct(string $productName = null, int $available)
     {
-        parent::__construct("Only {$available} unit(s) available in stock.");
+        $name = $productName ? "for {$productName}" : '';
+        parent::__construct("Only {$available} unit(s) available in stock {$name}.");
     }
 }

@@ -36,7 +36,6 @@ class ShippingQuoteService
 
         $rates = $this->shippingRepository->getActiveRatesForZone($zone->id);
 
-        //dd($rates);
 
         return array_values(
             array_filter(

@@ -22,6 +22,7 @@ final class CartItemResource extends JsonResource
             'slug'       => $this->entity->slug,
             'thumb'      => $this->entity->thumb,
             'quantity'   => $this->entity->quantity,
+            'unit_price' => $this->entity->unitPrice,
             'expires_at' => $this->entity->expiresAt->toISOString(),
         ];
     }
