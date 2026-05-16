@@ -39,9 +39,10 @@ class FreshStoreFront extends Command
 
         $this->info('Dropping tables: ' . implode(', ', $tables));
 
-        Schema::disableForeignKeyConstraints();
+        Schema::disableForeignKeyConstraints(); // does not work for postgress
         foreach ($tables as $table) {
-            Schema::dropIfExists($table);
+            //Schema::dropIfExists($table);
+            DB::statement('DROP TABLE IF EXISTS "' . $table . '" CASCADE');
             $this->line("  <fg=red>Dropped:</> {$table}");
         }
         Schema::enableForeignKeyConstraints();

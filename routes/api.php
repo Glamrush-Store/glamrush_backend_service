@@ -22,6 +22,7 @@ use App\Presentation\Http\Controllers\Catalog\RemoveCartItemController;
 use App\Presentation\Http\Controllers\Catalog\RemoveSavedItemController;
 use App\Presentation\Http\Controllers\Catalog\SyncSavedItemsController;
 use App\Presentation\Http\Controllers\Catalog\UpdateCartItemController;
+use App\Presentation\Http\Controllers\Checkout\CheckoutCartController;
 use App\Presentation\Http\Controllers\Customer\DeleteAddressController;
 use App\Presentation\Http\Controllers\Customer\ListAddressesController;
 use App\Presentation\Http\Controllers\Customer\SetDefaultAddressController;
@@ -29,6 +30,11 @@ use App\Presentation\Http\Controllers\Customer\ShowAddressController;
 use App\Presentation\Http\Controllers\Customer\StoreAddressController;
 use App\Presentation\Http\Controllers\Customer\UpdateAddressController;
 use App\Presentation\Http\Controllers\Shipping\GetShippingOptionsController;
+use App\Presentation\Http\Controllers\Payment\InitializePaymentController;
+use App\Presentation\Http\Controllers\Payment\ListPaymentMethodsController;
+use App\Presentation\Http\Controllers\Payment\PaymentWebhookController;
+use App\Presentation\Http\Controllers\Payment\VerifyPaymentController;
+use App\Presentation\Http\Controllers\Order\ListMyOrdersController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
@@ -106,9 +112,23 @@ Route::prefix('v1')->group(function () {
         Route::patch('/{address}/default', SetDefaultAddressController::class);
     });
 
+    Route::middleware('auth:sanctum')->prefix('orders')->group(function () {
+        Route::get('/', ListMyOrdersController::class);
+    });
+
     Route::prefix('shipping')->group(function () {
         Route::post('/getoptions', GetShippingOptionsController::class);
     });
+
+    // Checkout
+    Route::post('/checkout/cart', CheckoutCartController::class)
+        ->middleware('cart.identifier');
+
+    Route::get('/payment-methods', ListPaymentMethodsController::class);
+    Route::post('/payments/initialize', InitializePaymentController::class);
+    Route::post('/payments/verify', VerifyPaymentController::class);
+    Route::post('/payments/webhooks/{provider}', PaymentWebhookController::class)
+        ->whereIn('provider', ['paystack', 'flutterwave']);
 });
 
 

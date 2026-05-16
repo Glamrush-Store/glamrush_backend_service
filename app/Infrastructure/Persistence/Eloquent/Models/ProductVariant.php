@@ -25,6 +25,7 @@ class ProductVariant extends Model implements HasMedia
         'sale_ends_at',
         'manage_stock',
         'stock_quantity',
+        'reserved_quantity',
         'in_stock',
         'attributes',
         'sort_order',
@@ -36,6 +37,7 @@ class ProductVariant extends Model implements HasMedia
         'attributes' => 'array',
         'sale_starts_at' => 'datetime',
         'sale_ends_at' => 'datetime',
+        'reserved_quantity' => 'integer',
     ];
     protected $table = 'product_variants';
 

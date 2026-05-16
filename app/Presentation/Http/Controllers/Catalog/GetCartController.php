@@ -19,8 +19,11 @@ final class GetCartController
     {
         $id = $this->resolveIdentifier($request);
         $result = $this->service->getCart($id);
+        $items = $result['items'];
 
-        return $this->cartResponse($id, $result['items']->map(fn($e) => new CartItemResource($e))->values(), 200);
+        $subtotal = $items->sum(fn($e) => $e->unitPrice * $e->quantity);
+
+        return $this->cartResponse($id, $items->map(fn($e) => new CartItemResource($e))->values(), $subtotal, 200);
     }
 
     private function resolveIdentifier(Request $request): CartIdentifier
@@ -32,12 +35,13 @@ final class GetCartController
         return new CartIdentifier(null, $request->header('X-Cart-Token'));
     }
 
-    private function cartResponse(CartIdentifier $id, mixed $data, int $status): JsonResponse
+    private function cartResponse(CartIdentifier $id, mixed $data, float $subtotal, int $status): JsonResponse
     {
         return response()->json([
-            'success' => true,
-            'message' => 'Success',
-            'data' => $data,
+            'success'    => true,
+            'message'    => 'Success',
+            'data'       => $data,
+            'subtotal'   => $subtotal,
             'cart_token' => $id->isGuest() ? $id->cartToken : null,
         ], $status);
     }

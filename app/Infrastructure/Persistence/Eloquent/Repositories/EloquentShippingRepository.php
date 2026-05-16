@@ -17,15 +17,11 @@ use App\Infrastructure\Persistence\Eloquent\Mappers\Shipping\ShippingZoneMapper;
 use App\Infrastructure\Persistence\Eloquent\Models\ShippingRate;
 use App\Infrastructure\Persistence\Eloquent\Models\ShippingZone;
 
+
 class EloquentShippingRepository implements ShippingRepository
 {
 
-    public function getShippingOptions(ShippingAddressEntity $address)
-    {
-        return [];
-    }
-
-    public function findBestZoneForAddress(ShippingAddressEntity $address): ?ShippingZoneEntity
+    public function findBestZoneForAddress(ShippingAddressEntity $address): null|ShippingZoneEntity
     {
         $model = ShippingZone::query()
             ->where('is_active', true)

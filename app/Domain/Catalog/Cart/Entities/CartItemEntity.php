@@ -13,6 +13,7 @@ final class CartItemEntity
         public readonly string $slug,
         public readonly ?string $thumb,
         public readonly int $quantity,
+        public readonly float $unitPrice,
         public readonly Carbon $expiresAt,
     ) {}
 }

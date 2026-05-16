@@ -16,17 +16,13 @@ function shippingFakeRepository(?ShippingZoneEntity $zone, array $rates): Shippi
         ) {
         }
 
-        public function getShippingOptions(ShippingAddressEntity $address)
-        {
-            return [];
-        }
 
-        public function findBestZoneForAddress(ShippingAddressEntity $address)
+        public function findBestZoneForAddress(ShippingAddressEntity $address): null|ShippingZoneEntity
         {
             return $this->zone;
         }
 
-        public function getActiveRatesForZone(string $zoneId)
+        public function getActiveRatesForZone(string $zoneId): array
         {
             return $this->rates;
         }
