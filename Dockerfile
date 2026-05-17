@@ -24,6 +24,7 @@ RUN apt-get update \
         libpq-dev \
         libwebp-dev \
         libzip-dev \
+        procps \
         unzip \
     && docker-php-ext-configure gd --with-freetype --with-jpeg --with-webp \
     && docker-php-ext-install -j"$(nproc)" \
