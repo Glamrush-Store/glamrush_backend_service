@@ -8,7 +8,7 @@
 
 namespace App\Providers;
 
-use App\Filesystem\GcsFilesystemAdapter;
+use App\FileSystem\GcsFilesystemAdapter;
 use Exception;
 use Google\Cloud\Storage\StorageClient;
 use GuzzleHttp\Client;

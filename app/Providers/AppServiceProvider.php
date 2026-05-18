@@ -16,7 +16,6 @@ use App\Domain\Shipping\Contracts\ShippingRepository;
 use App\Domain\User\Contracts\AddressRepository;
 use App\Domain\User\Contracts\SocialAccountRepository;
 use App\Domain\User\Contracts\UserRepository;
-use App\Listeners\Order\CommitReservedInventory;
 use App\Infrastructure\Persistence\Eloquent\Models\Category;
 use App\Infrastructure\Persistence\Eloquent\Models\Product;
 use App\Infrastructure\Persistence\Eloquent\Models\ProductVariant;
@@ -34,9 +33,11 @@ use App\Infrastructure\Persistence\Eloquent\Repositories\EloquentSavedItemReposi
 use App\Infrastructure\Persistence\Eloquent\Repositories\EloquentShippingRepository;
 use App\Infrastructure\Persistence\Eloquent\Repositories\EloquentSocialAccountRepository;
 use App\Infrastructure\Persistence\Eloquent\Repositories\EloquentUserRepository;
+use App\Listeners\Order\CommitReservedInventory;
 use Illuminate\Database\Eloquent\Relations\Relation;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\ServiceProvider;
+use RuntimeException;
 
 class AppServiceProvider extends ServiceProvider
 {
@@ -115,6 +116,32 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
+        $encoded = env('GOOGLE_APPLICATION_CREDENTIALS_BASE64');
+
+        if ($encoded) {
+            $directory = storage_path('app');
+            $path = $directory . '/google-credentials.json';
+
+            if (!is_dir($directory)) {
+                mkdir($directory, 0755, true);
+            }
+
+            $decoded = base64_decode($encoded, true);
+
+            if ($decoded === false) {
+                throw new RuntimeException('Invalid GOOGLE_APPLICATION_CREDENTIALS_BASE64 value.');
+            }
+
+            if (!file_exists($path)) {
+                file_put_contents($path, $decoded);
+            }
+
+            putenv('GOOGLE_APPLICATION_CREDENTIALS=' . $path);
+            $_ENV['GOOGLE_APPLICATION_CREDENTIALS'] = $path;
+            $_SERVER['GOOGLE_APPLICATION_CREDENTIALS'] = $path;
+        }
+
+
         Relation::enforceMorphMap([
             'category' => Category::class,
             'product' => Product::class,
