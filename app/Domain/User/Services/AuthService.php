@@ -5,6 +5,7 @@ namespace App\Domain\User\Services;
 use App\Domain\User\Contracts\SocialAccountRepository;
 use App\Domain\User\Contracts\UserRepository;
 use App\Domain\User\Entities\UserEntity;
+use App\Domain\User\Events\UserRegistered;
 use App\Infrastructure\Persistence\Eloquent\Models\User;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
@@ -26,6 +27,8 @@ final class AuthService
         $userEntity = $this->userRepository->create($data);
         $user = User::findOrFail($userEntity->id);
         $token = $user->createToken('api')->plainTextToken;
+
+        event(new UserRegistered((string)$user->id));
 
         return ['user' => $userEntity, 'token' => $token];
     }
@@ -77,6 +80,7 @@ final class AuthService
                 'password' => Str::random(32),
             ]);
             $userByEmail = User::findOrFail($userEntity->id);
+            event(new UserRegistered((string)$userByEmail->id));
         } else {
             $userEntity = $this->userRepository->findById((string)$userByEmail->id);
         }

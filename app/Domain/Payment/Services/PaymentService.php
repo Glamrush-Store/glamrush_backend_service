@@ -4,11 +4,13 @@ namespace App\Domain\Payment\Services;
 
 use App\Domain\Order\Contracts\OrderRepository;
 use App\Domain\Order\Events\OrderPaid;
+use App\Domain\Order\Events\OrderPendingOnDelivery;
 use App\Domain\Payment\Actions\GeneratePaymentReferenceAction;
 use App\Domain\Payment\Contracts\PaymentMethodRepository;
 use App\Domain\Payment\Contracts\PaymentRepository;
 use App\Domain\Payment\Entities\PaymentInitializationEntity;
 use App\Domain\Payment\Enums\PaymentStatus;
+use App\Domain\Payment\Events\PaymentFailed;
 use App\Infrastructure\Payment\PaymentGatewayResolver;
 use RuntimeException;
 
@@ -62,6 +64,7 @@ final class PaymentService
 
         if ($initialization->status === PaymentStatus::PENDING_ON_DELIVERY->value) {
             $this->orders->markAsPendingOnDelivery($order->id);
+            event(new OrderPendingOnDelivery($order->id, $payment->id));
         }
 
         return new PaymentInitializationEntity(
@@ -123,13 +126,17 @@ final class PaymentService
             event(new OrderPaid($payment->orderId));
         }
 
-        if (! $verification->succeeded() && $payment->status === 'pending') {
+        if (
+            ! $verification->succeeded() &&
+            in_array($payment->status, [PaymentStatus::PENDING->value, PaymentStatus::INITIALIZED->value], true)
+        ) {
             $payment = $this->payments->markAsFailed(
                 paymentId: $payment->id,
                 providerReference: $verification->providerReference,
                 transactionId: $verification->transactionId,
                 payload: $verification->payload,
             );
+            event(new PaymentFailed($payment->id));
         }
 
         return new PaymentInitializationEntity(

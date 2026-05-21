@@ -5,6 +5,7 @@ namespace App\Domain\Order\Services;
 use App\Domain\Catalog\Cart\CartIdentifier;
 use App\Domain\Order\Contracts\CheckoutRepository;
 use App\Domain\Order\Entities\OrderEntity;
+use App\Domain\Order\Events\OrderPlaced;
 use App\Domain\Shipping\Entities\ShippingAddressEntity;
 
 final class CheckoutService
@@ -23,7 +24,7 @@ final class CheckoutService
         string $paymentMethod,
         ?int $userId,
     ): OrderEntity {
-        return $this->checkoutRepository->createPendingOrderFromCart(
+        $order = $this->checkoutRepository->createPendingOrderFromCart(
             cartIdentifier: $cartIdentifier,
             shippingAddress: $shippingAddress,
             shippingAddressPayload: $shippingAddressPayload,
@@ -32,5 +33,9 @@ final class CheckoutService
             paymentMethod: $paymentMethod,
             userId: $userId,
         );
+
+        event(new OrderPlaced($order->id));
+
+        return $order;
     }
 }

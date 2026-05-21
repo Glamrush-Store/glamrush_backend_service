@@ -10,12 +10,17 @@ use App\Domain\Catalog\SavedItem\Contracts\SavedItemRepository;
 use App\Domain\Order\Contracts\CheckoutRepository;
 use App\Domain\Order\Contracts\OrderRepository;
 use App\Domain\Order\Events\OrderPaid;
+use App\Domain\Order\Events\OrderPendingOnDelivery;
+use App\Domain\Order\Events\OrderPlaced;
 use App\Domain\Payment\Contracts\PaymentMethodRepository;
 use App\Domain\Payment\Contracts\PaymentRepository;
+use App\Domain\Payment\Events\PaymentFailed;
 use App\Domain\Shipping\Contracts\ShippingRepository;
 use App\Domain\User\Contracts\AddressRepository;
+use App\Domain\User\Events\UserRegistered;
 use App\Domain\User\Contracts\SocialAccountRepository;
 use App\Domain\User\Contracts\UserRepository;
+use App\Listeners\Auth\SendWelcomeEmail;
 use App\Infrastructure\Persistence\Eloquent\Models\Category;
 use App\Infrastructure\Persistence\Eloquent\Models\Product;
 use App\Infrastructure\Persistence\Eloquent\Models\ProductVariant;
@@ -34,6 +39,10 @@ use App\Infrastructure\Persistence\Eloquent\Repositories\EloquentShippingReposit
 use App\Infrastructure\Persistence\Eloquent\Repositories\EloquentSocialAccountRepository;
 use App\Infrastructure\Persistence\Eloquent\Repositories\EloquentUserRepository;
 use App\Listeners\Order\CommitReservedInventory;
+use App\Listeners\Order\SendOrderPlacedEmails;
+use App\Listeners\Order\SendPaymentSuccessfulEmail;
+use App\Listeners\Order\SendPendingOnDeliveryEmail;
+use App\Listeners\Payment\SendPaymentFailedEmail;
 use Illuminate\Database\Eloquent\Relations\Relation;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\ServiceProvider;
@@ -150,5 +159,10 @@ class AppServiceProvider extends ServiceProvider
         ]);
 
         Event::listen(OrderPaid::class, CommitReservedInventory::class);
+        Event::listen(OrderPaid::class, SendPaymentSuccessfulEmail::class);
+        Event::listen(OrderPlaced::class, SendOrderPlacedEmails::class);
+        Event::listen(OrderPendingOnDelivery::class, SendPendingOnDeliveryEmail::class);
+        Event::listen(PaymentFailed::class, SendPaymentFailedEmail::class);
+        Event::listen(UserRegistered::class, SendWelcomeEmail::class);
     }
 }
