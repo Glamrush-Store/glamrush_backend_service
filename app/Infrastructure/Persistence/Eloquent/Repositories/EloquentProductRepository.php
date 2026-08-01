@@ -1,4 +1,5 @@
 <?php
+
 /*
  * © 2025 Demilade Oyewusi
  * Licensed under the MIT License.
@@ -23,6 +24,14 @@ use Illuminate\Support\Facades\DB;
 
 final class EloquentProductRepository implements ProductRepository
 {
+    private const SORT_COLUMNS = [
+        'name' => 'products.name',
+        'price' => 'products.price',
+        'created_at' => 'products.created_at',
+        'sort_order' => 'products.sort_order',
+        'featured' => 'products.is_featured',
+    ];
+
     public function __construct(
         private readonly VariantAttributeEnricher $enricher,
     ) {
@@ -53,7 +62,7 @@ final class EloquentProductRepository implements ProductRepository
                 'products.sort_order',
                 'products.published_at',
                 'products.category_id',
-                'products.brand_id'
+                'products.brand_id',
             ])
             ->where('slug', $slug)
             ->with([
@@ -64,7 +73,6 @@ final class EloquentProductRepository implements ProductRepository
             ])
             ->first();
 
-
         if (!$model) {
             return null;
         }
@@ -73,7 +81,6 @@ final class EloquentProductRepository implements ProductRepository
 
         return ProductMapper::toDomain($model);
     }
-
 
     public function paginate(ListProductsQuery $query): LengthAwarePaginator
     {
@@ -104,6 +111,7 @@ final class EloquentProductRepository implements ProductRepository
             ]);
 
         $this->constrainQuery($builder, $query);
+        $this->applySorting($builder, $query);
 
         $paginator = $builder->paginate($query->perPage);
 
@@ -131,8 +139,16 @@ final class EloquentProductRepository implements ProductRepository
             $builder->whereHas('brand', fn($q) => $q->where('slug', $query->brandSlug));
         }
 
+        if (!in_array('collection', $exclude) && $query->collectionSlug) {
+            $builder->whereHas('collections', fn($q) => $q->where('collections.slug', $query->collectionSlug));
+        }
+
         if (!in_array('featured', $exclude) && !is_null($query->featured)) {
             $builder->where('is_featured', $query->featured);
+        }
+
+        if (!in_array('onSale', $exclude) && !is_null($query->onSale)) {
+            $this->constrainOnSale($builder, $query->onSale);
         }
 
         if (!in_array('price', $exclude) && ($query->minPrice || $query->maxPrice)) {
@@ -155,7 +171,7 @@ final class EloquentProductRepository implements ProductRepository
         }
 
         if (!in_array('attributes', $exclude)) {
-            //dd("attributes");
+            // dd("attributes");
             $has = $query->filters['attributes']['$has'] ?? null;
             if (!empty($has)) {
                 // Normalize: single object → wrap in array
@@ -166,7 +182,7 @@ final class EloquentProductRepository implements ProductRepository
                         continue;
                     }
                     $json = json_encode([['type' => $condition['type'], 'value' => $condition['value']]]);
-                    $builder->whereHas('variants', fn($q) => $q->whereRaw("attributes::jsonb @> ?::jsonb", [$json]));
+                    $builder->whereHas('variants', fn($q) => $q->whereRaw('attributes::jsonb @> ?::jsonb', [$json]));
                 }
             }
         }
@@ -187,6 +203,47 @@ final class EloquentProductRepository implements ProductRepository
         $collect($category);
 
         return $ids;
+    }
+
+    private function constrainOnSale(Builder $builder, bool $onSale): void
+    {
+        $now = now();
+
+        if ($onSale) {
+            $builder->where(function (Builder $q) use ($now) {
+                $q->whereNotNull('products.sale_price')
+                    ->where('products.sale_price', '>', 0)
+                    ->whereNotNull('products.sale_starts_at')
+                    ->where('products.sale_starts_at', '<=', $now)
+                    ->whereNotNull('products.sale_ends_at')
+                    ->where('products.sale_ends_at', '>=', $now);
+            });
+
+            return;
+        }
+
+        $builder->where(function (Builder $q) use ($now) {
+            $q->whereNull('products.sale_price')
+                ->orWhere('products.sale_price', '<=', 0)
+                ->orWhereNull('products.sale_starts_at')
+                ->orWhere('products.sale_starts_at', '>', $now)
+                ->orWhereNull('products.sale_ends_at')
+                ->orWhere('products.sale_ends_at', '<', $now);
+        });
+    }
+
+    private function applySorting(Builder $builder, ListProductsQuery $query): void
+    {
+        $direction = strtolower($query->direction) === 'desc' ? 'desc' : 'asc';
+        $sortColumn = $query->sort ? (self::SORT_COLUMNS[$query->sort] ?? null) : null;
+
+        if ($sortColumn) {
+            $builder->orderBy($sortColumn, $direction);
+        }
+
+        $builder
+            ->orderBy('products.sort_order')
+            ->orderBy('products.name');
     }
 
     // ------------------------------------------------------------------

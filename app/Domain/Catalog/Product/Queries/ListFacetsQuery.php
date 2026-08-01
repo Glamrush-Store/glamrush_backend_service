@@ -10,13 +10,14 @@ final class ListFacetsQuery implements CacheableQuery
 
     public function cacheKey(): string
     {
-        return 'catalog:facets:' . md5(json_encode([
+        return 'catalog:facets:'.md5(json_encode([
             'category' => $this->inner->categorySlug,
-            'brand'    => $this->inner->brandSlug,
+            'brand' => $this->inner->brandSlug,
             'featured' => $this->inner->featured,
+            'onSale' => $this->inner->onSale,
             'minPrice' => $this->inner->minPrice,
             'maxPrice' => $this->inner->maxPrice,
-            'search'   => $this->inner->search,
+            'search' => $this->inner->search,
         ]));
     }
 

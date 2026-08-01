@@ -72,6 +72,9 @@ Route::prefix('v1')->group(function () {
 
     Route::get('/products/{slug}', GetProductController::class);
 
+    // Collections
+    Route::get('/collections/{collection}/products', ListProductController::class);
+
     //Categories
     Route::get('/categories', ListCategoryController::class);
 

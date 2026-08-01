@@ -15,6 +15,7 @@
 | `price_min` | number  | —       | Minimum price (inclusive, matched against default variant) |
 | `price_max` | number  | —       | Maximum price (inclusive, matched against default variant) |
 | `featured`  | boolean | —       | `true` returns only featured products                      |
+| `onSale`    | boolean | —       | `true` returns active sale products; `false` excludes them |
 | `sort`      | string  | —       | Column to sort by (e.g. `name`, `price`)                   |
 | `direction` | string  | `asc`   | Sort direction: `asc` or `desc`                            |
 | `page`      | integer | `1`     | Page number                                                |
@@ -301,6 +302,14 @@ GET /api/v1/products?category=shoes&price_min=50&price_max=150
 `facets.price_range` returns the full range for that category (ignoring the active price filter), so the slider always
 shows the correct bounds.
 
+### User filters by sale status
+
+```
+GET /api/v1/products?onSale=true
+```
+
+Use `onSale=false` to return products that are not currently in an active sale window.
+
 ### Search with facets
 
 ```
@@ -321,7 +330,7 @@ Facets do **not** change with page — they always reflect the full filtered set
 
 ## State Management Tips
 
-- Store active filters as a flat object `{ category, brand, price_min, price_max, search, attributes: [] }`.
+- Store active filters as a flat object `{ category, brand, price_min, price_max, onSale, search, attributes: [] }`.
 - When rendering a facet option, mark it as **active** if its value matches the current filter state.
 - When a user selects a brand, update `brand` in the filter state and refetch. The response will contain refreshed
   facets.
