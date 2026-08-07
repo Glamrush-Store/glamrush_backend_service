@@ -1,10 +1,10 @@
 <?php
+
 /*
  * © 2026 Demilade Oyewusi
  * Licensed under the MIT License.
  * See the LICENSE file for details.
  */
-
 
 namespace App\Domain\Catalog\Product\Entities;
 
@@ -26,7 +26,7 @@ final class ProductEntity
         public readonly ?vendorEntity $vendor,
         public readonly ?CategoryEntity $category,
         public readonly ?BrandEntity $brand,
-        public readonly array $images = [],
+        public readonly array $images,
         public float $price,
         private ?float $salePrice,
         private ?string $saleStartsAt,
@@ -35,21 +35,34 @@ final class ProductEntity
         public int $stockQuantity,
         private bool $inStock,
         private array $variants = [],
-    ) {
-    }
+    ) {}
 
     /* ------------------------------------------
      |  Aggregate Behavior
      -------------------------------------------*/
 
-// correct
     public function effectivePrice(DateTimeImmutable $now): float
     {
-        if (!$this->isOnSale($now)) {
-            return $this->price;
+        return $this->currentSalePrice($now) ?? $this->originalPrice();
+    }
+
+    public function originalPrice(): float
+    {
+        return $this->isVariable() && $this->defaultVariant()
+            ? $this->defaultVariant()->price
+            : $this->price;
+    }
+
+    public function currentSalePrice(DateTimeImmutable $now): ?float
+    {
+        if ($this->isVariable()) {
+            return $this->defaultVariant()?->currentSalePrice($now);
         }
+
         if (
-            $this->salePrice &&
+            $this->salePrice !== null &&
+            $this->salePrice > 0 &&
+            $this->salePrice < $this->price &&
             $this->saleStartsAt &&
             $this->saleEndsAt &&
             $now >= new DateTimeImmutable($this->saleStartsAt) &&
@@ -57,18 +70,13 @@ final class ProductEntity
         ) {
             return $this->salePrice;
         }
+
+        return null;
     }
 
     public function isOnSale(DateTimeImmutable $now): bool
     {
-        if ($this->salePrice &&
-            $this->saleStartsAt &&
-            $this->saleEndsAt &&
-            now()->between($this->saleStartsAt, $this->saleEndsAt)) {
-            return true;
-        }
-
-        return false;
+        return $this->currentSalePrice($now) !== null;
     }
 
     public function defaultAttributes(): array
@@ -78,7 +86,7 @@ final class ProductEntity
 
     public function displayDefaultAttributes(): array
     {
-        if (!$this->isVariable()) {
+        if (! $this->isVariable()) {
             return [];
         }
 
@@ -96,7 +104,6 @@ final class ProductEntity
         return null;
     }
 
-
     public function isAvailable(): bool
     {
         if ($this->isVariable()) {
@@ -105,16 +112,16 @@ final class ProductEntity
                     return true;
                 }
             }
+
             return false;
         }
 
-        if (!$this->manageStock) {
+        if (! $this->manageStock) {
             return true;
         }
 
         return $this->inStock && $this->stockQuantity > 0;
     }
-
 
     public function isVariable(): bool
     {
@@ -128,7 +135,7 @@ final class ProductEntity
 
     public function displayVariants(): array
     {
-        if (!$this->isVariable()) {
+        if (! $this->isVariable()) {
             return [];
         }
 

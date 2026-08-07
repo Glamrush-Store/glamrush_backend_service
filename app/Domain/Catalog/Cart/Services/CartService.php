@@ -17,23 +17,23 @@ final class CartService
     public function getCart(CartIdentifier $id): array
     {
         return [
-            'items'      => $this->repository->getItems($id),
+            'items' => $this->repository->getItems($id),
             'cart_token' => $id->cartToken,
         ];
     }
 
-    public function add(CartIdentifier $id, string $productId, int $quantity): array
+    public function add(CartIdentifier $id, string $productId, ?string $productVariantId, int $quantity): array
     {
         if ($id->isGuest() && $id->cartToken === null) {
             $id = new CartIdentifier(null, Str::uuid()->toString());
         }
 
-        $entity = $this->repository->addItem($id, $productId, $quantity);
+        $entity = $this->repository->addItem($id, $productId, $productVariantId, $quantity);
 
         return [
-            'entity'     => $entity,
+            'entity' => $entity,
             'cart_token' => $id->cartToken,
-            'created'    => true,
+            'created' => true,
         ];
     }
 
@@ -47,15 +47,29 @@ final class CartService
         $this->repository->removeItem($id, $productId);
     }
 
+    public function updateById(CartIdentifier $id, int $itemId, int $quantity): CartItemEntity
+    {
+        return $this->repository->updateItemById($id, $itemId, $quantity);
+    }
+
+    public function removeById(CartIdentifier $id, int $itemId): void
+    {
+        $this->repository->removeItemById($id, $itemId);
+    }
+
     public function clear(CartIdentifier $id): void
     {
         $this->repository->clearCart($id);
     }
 
-    public function merge(int $userId, string $cartToken): Collection
+    /** @return array{items: Collection, guest_cart_empty: bool} */
+    public function merge(int $userId, string $cartToken): array
     {
         $this->repository->mergeGuestCart($userId, $cartToken);
 
-        return $this->repository->getItems(new CartIdentifier($userId, null));
+        return [
+            'items' => $this->repository->getItems(new CartIdentifier($userId, null)),
+            'guest_cart_empty' => ! $this->repository->hasGuestItems($cartToken),
+        ];
     }
 }

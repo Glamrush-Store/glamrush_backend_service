@@ -3,7 +3,7 @@
 namespace App\Domain\Order\Contracts;
 
 use App\Domain\Catalog\Cart\CartIdentifier;
-use App\Domain\Order\Entities\OrderEntity;
+use App\Domain\Order\Entities\CheckoutResult;
 use App\Domain\Shipping\Entities\ShippingAddressEntity;
 
 interface CheckoutRepository
@@ -16,5 +16,8 @@ interface CheckoutRepository
         string $shippingRateId,
         string $paymentMethod,
         ?int $userId,
-    ): OrderEntity;
+        string $idempotencyOwner,
+        string $idempotencyKey,
+        string $requestHash,
+    ): CheckoutResult;
 }

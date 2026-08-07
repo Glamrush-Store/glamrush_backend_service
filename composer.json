@@ -18,8 +18,12 @@
         "laravel/socialite": "^5.24",
         "laravel/tinker": "^2.10.1",
         "league/flysystem-google-cloud-storage": "^3.31",
+        "php-amqplib/php-amqplib": "^3.7",
         "resend/resend-php": "^1.3",
         "spatie/laravel-medialibrary": "^11.17"
+    },
+    "suggest": {
+        "ext-rdkafka": "Required when EVENT_BUS_DRIVER=kafka"
     },
     "require-dev": {
         "fakerphp/faker": "^1.23",

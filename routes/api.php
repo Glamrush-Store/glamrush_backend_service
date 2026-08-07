@@ -18,9 +18,11 @@ use App\Presentation\Http\Controllers\Catalog\ListCategoryController;
 use App\Presentation\Http\Controllers\Catalog\ListProductController;
 use App\Presentation\Http\Controllers\Catalog\ListSavedItemsController;
 use App\Presentation\Http\Controllers\Catalog\MergeCartController;
+use App\Presentation\Http\Controllers\Catalog\RemoveCartItemByIdController;
 use App\Presentation\Http\Controllers\Catalog\RemoveCartItemController;
 use App\Presentation\Http\Controllers\Catalog\RemoveSavedItemController;
 use App\Presentation\Http\Controllers\Catalog\SyncSavedItemsController;
+use App\Presentation\Http\Controllers\Catalog\UpdateCartItemByIdController;
 use App\Presentation\Http\Controllers\Catalog\UpdateCartItemController;
 use App\Presentation\Http\Controllers\Checkout\CheckoutCartController;
 use App\Presentation\Http\Controllers\Customer\DeleteAddressController;
@@ -29,27 +31,56 @@ use App\Presentation\Http\Controllers\Customer\SetDefaultAddressController;
 use App\Presentation\Http\Controllers\Customer\ShowAddressController;
 use App\Presentation\Http\Controllers\Customer\StoreAddressController;
 use App\Presentation\Http\Controllers\Customer\UpdateAddressController;
-use App\Presentation\Http\Controllers\Shipping\GetShippingOptionsController;
+use App\Presentation\Http\Controllers\Order\ListMyOrdersController;
 use App\Presentation\Http\Controllers\Payment\InitializePaymentController;
 use App\Presentation\Http\Controllers\Payment\ListPaymentMethodsController;
 use App\Presentation\Http\Controllers\Payment\PaymentWebhookController;
 use App\Presentation\Http\Controllers\Payment\VerifyPaymentController;
-use App\Presentation\Http\Controllers\Order\ListMyOrdersController;
+use App\Presentation\Http\Controllers\Shipping\GetShippingOptionsController;
+use App\Presentation\Http\Controllers\Storefront\GetHomepageController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
-
 
 Route::get('/user', function (Request $request) {
     return $request->user();
 })->middleware('auth:sanctum');
 
-
 // ========================================================
 //  CATALOG API ROUTES
 // ========================================================
 
-
 Route::prefix('v1')->group(function () {
+    // Single-root-category storefront. These routes preserve the existing
+    // full catalog API while enforcing the selected root category tree.
+    Route::prefix('storefronts/{storefront}')
+        ->middleware('storefront.category')
+        ->group(function () {
+            Route::middleware('public.cache')->group(function () {
+                Route::get('/homepage', GetHomepageController::class);
+                Route::get('/categories', ListCategoryController::class);
+                Route::get('/products', ListProductController::class);
+                Route::get('/products/{slug}', GetProductController::class);
+                Route::get('/collections/{collection}/products', ListProductController::class);
+            });
+
+            Route::prefix('cart')->group(function () {
+                Route::post('/', AddToCartController::class);
+                Route::post('/merge', MergeCartController::class)->middleware('auth:sanctum');
+
+                Route::middleware('cart.identifier')->group(function () {
+                    Route::get('/', GetCartController::class);
+                    Route::patch('/items/{itemId}', UpdateCartItemByIdController::class);
+                    Route::delete('/items/{itemId}', RemoveCartItemByIdController::class);
+                    Route::patch('/{productId}', UpdateCartItemController::class);
+                    Route::delete('/{productId}', RemoveCartItemController::class);
+                    Route::delete('/', ClearCartController::class);
+                });
+            });
+
+            Route::post('/checkout/cart', CheckoutCartController::class)
+                ->middleware(['cart.identifier', 'idempotency.required']);
+        });
+
     // ======================================================
     //  AUTH ROUTES
     // ======================================================
@@ -67,19 +98,22 @@ Route::prefix('v1')->group(function () {
         });
     });
 
-    //Products
-    Route::get('/products', ListProductController::class);
+    // Products
+    Route::middleware('public.cache')->group(function () {
+        Route::get('/products', ListProductController::class);
+        Route::get('/products/{slug}', GetProductController::class);
 
-    Route::get('/products/{slug}', GetProductController::class);
+        // Collections
+        Route::get('/collections/{collection}/products', ListProductController::class);
 
-    //Categories
-    Route::get('/categories', ListCategoryController::class);
+        // Categories
+        Route::get('/categories', ListCategoryController::class);
 
-//    Route::get('/categories/{slug}', [CategoryController::class, 'show']);
+        // Brands
+        Route::get('/brands', ListBrandController::class);
+    });
 
-
-    //Brands
-    Route::get('/brands', ListBrandController::class);
+    //    Route::get('/categories/{slug}', [CategoryController::class, 'show']);
 
     // Cart
     Route::prefix('cart')->group(function () {
@@ -88,6 +122,8 @@ Route::prefix('v1')->group(function () {
 
         Route::middleware('cart.identifier')->group(function () {
             Route::get('/', GetCartController::class);
+            Route::patch('/items/{itemId}', UpdateCartItemByIdController::class);
+            Route::delete('/items/{itemId}', RemoveCartItemByIdController::class);
             Route::patch('/{productId}', UpdateCartItemController::class);
             Route::delete('/{productId}', RemoveCartItemController::class);
             Route::delete('/', ClearCartController::class);
@@ -122,14 +158,14 @@ Route::prefix('v1')->group(function () {
 
     // Checkout
     Route::post('/checkout/cart', CheckoutCartController::class)
-        ->middleware('cart.identifier');
+        ->middleware(['cart.identifier', 'idempotency.required']);
 
-    Route::get('/payment-methods', ListPaymentMethodsController::class);
-    Route::post('/payments/initialize', InitializePaymentController::class);
+    Route::get('/payment-methods', ListPaymentMethodsController::class)->middleware('public.cache');
+    Route::post('/payments/initialize', InitializePaymentController::class)
+        ->middleware('idempotency.required');
     Route::post('/payments/verify', VerifyPaymentController::class);
     Route::post('/payments/webhooks/{provider}', PaymentWebhookController::class)
         ->whereIn('provider', ['paystack', 'flutterwave']);
 });
 
-
-Route::get('/test', fn() => 'test worked');
+Route::get('/test', fn () => 'test worked');

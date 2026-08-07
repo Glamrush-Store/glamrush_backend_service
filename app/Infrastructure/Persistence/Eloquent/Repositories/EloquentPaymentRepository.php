@@ -13,10 +13,19 @@ use App\Infrastructure\Persistence\Eloquent\Models\PaymentTransaction;
 
 final class EloquentPaymentRepository implements PaymentRepository
 {
-    public function createPending(OrderEntity $order, PaymentMethodEntity $method, string $reference): PaymentEntity
-    {
+    public function createPending(
+        OrderEntity $order,
+        PaymentMethodEntity $method,
+        string $reference,
+        string $idempotencyOwner,
+        string $idempotencyKey,
+        string $requestHash,
+    ): PaymentEntity {
         $payment = Payment::create([
             'order_id' => $order->id,
+            'idempotency_owner' => $idempotencyOwner,
+            'idempotency_key' => $idempotencyKey,
+            'idempotency_request_hash' => $requestHash,
             'payment_method_id' => $method->id,
             'provider' => $method->code,
             'reference' => $reference,
@@ -34,6 +43,7 @@ final class EloquentPaymentRepository implements PaymentRepository
             amount: (float) $payment->amount,
             currency: $payment->currency,
             payload: [],
+            eventKey: "payment:{$payment->id}:created",
         );
 
         return PaymentMapper::toDomain($payment);
@@ -57,6 +67,7 @@ final class EloquentPaymentRepository implements PaymentRepository
             amount: (float) $payment->amount,
             currency: $payment->currency,
             payload: $metadata,
+            eventKey: "payment:{$paymentId}:initialized",
         );
 
         return PaymentMapper::toDomain($payment->refresh());
@@ -66,6 +77,26 @@ final class EloquentPaymentRepository implements PaymentRepository
     {
         $payment = Payment::query()
             ->where('reference', $reference)
+            ->first();
+
+        return $payment ? PaymentMapper::toDomain($payment) : null;
+    }
+
+    public function findByReferenceForUpdate(string $reference): ?PaymentEntity
+    {
+        $payment = Payment::query()
+            ->where('reference', $reference)
+            ->lockForUpdate()
+            ->first();
+
+        return $payment ? PaymentMapper::toDomain($payment) : null;
+    }
+
+    public function findByIdempotency(string $owner, string $key): ?PaymentEntity
+    {
+        $payment = Payment::query()
+            ->where('idempotency_owner', $owner)
+            ->where('idempotency_key', $key)
             ->first();
 
         return $payment ? PaymentMapper::toDomain($payment) : null;
@@ -91,6 +122,7 @@ final class EloquentPaymentRepository implements PaymentRepository
             amount: (float) $payment->amount,
             currency: $payment->currency,
             payload: $payload,
+            eventKey: "payment:{$paymentId}:paid:{$transactionId}",
         );
 
         return PaymentMapper::toDomain($payment->refresh());
@@ -116,6 +148,7 @@ final class EloquentPaymentRepository implements PaymentRepository
             amount: (float) $payment->amount,
             currency: $payment->currency,
             payload: $payload,
+            eventKey: "payment:{$paymentId}:failed:{$transactionId}",
         );
 
         return PaymentMapper::toDomain($payment->refresh());
@@ -129,16 +162,24 @@ final class EloquentPaymentRepository implements PaymentRepository
         ?float $amount,
         ?string $currency,
         array $payload = [],
-    ): void {
-        PaymentTransaction::create([
+        ?string $eventKey = null,
+    ): bool {
+        $attributes = [
             'payment_id' => $paymentId,
+            'event_key' => $eventKey,
             'type' => $type,
             'status' => $status,
             'provider_reference' => $providerReference,
             'amount' => $amount,
             'currency' => $currency,
             'payload' => $payload,
-        ]);
+        ];
+
+        $transaction = $eventKey === null
+            ? PaymentTransaction::query()->create($attributes)
+            : PaymentTransaction::query()->firstOrCreate(['event_key' => $eventKey], $attributes);
+
+        return $transaction->wasRecentlyCreated;
     }
 
     public function referenceExists(string $reference): bool

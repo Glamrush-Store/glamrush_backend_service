@@ -22,6 +22,7 @@ RUN apt-get update \
         libjpeg62-turbo-dev \
         libpng-dev \
         libpq-dev \
+        librdkafka-dev \
         libwebp-dev \
         libzip-dev \
         procps \
@@ -36,8 +37,8 @@ RUN apt-get update \
         pdo_pgsql \
         sockets \
         zip \
-    && pecl install redis swoole \
-    && docker-php-ext-enable opcache redis swoole \
+    && pecl install redis swoole rdkafka \
+    && docker-php-ext-enable opcache redis swoole rdkafka \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 

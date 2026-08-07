@@ -12,386 +12,68 @@
         }
     ],
     "paths": {
-        "/api/categories": {
+        "/api/v1/storefronts/{storefront}/homepage": {
             "get": {
                 "tags": [
-                    "Categories"
+                    "Storefront"
                 ],
-                "summary": "Get categories",
-                "operationId": "9ccff7aa6acc1f3079a6b0e0b6463e69",
+                "summary": "Get the fully hydrated public storefront homepage",
+                "operationId": "getStorefrontHomepage",
                 "parameters": [
                     {
-                        "name": "parent",
-                        "in": "query",
-                        "required": false,
-                        "schema": {
-                            "type": "string"
-                        }
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "Paginated category list",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/Categories"
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        },
-        "/api/categories/{slug}": {
-            "get": {
-                "tags": [
-                    "Categories"
-                ],
-                "summary": "Get category details",
-                "operationId": "54a7c38ac5f993fe556805bb92d21e39",
-                "parameters": [
-                    {
-                        "name": "slug",
+                        "name": "storefront",
                         "in": "path",
+                        "description": "Active root-category storefront slug",
                         "required": true,
                         "schema": {
-                            "type": "string"
+                            "type": "string",
+                            "example": "fragrances"
                         }
                     }
                 ],
                 "responses": {
                     "200": {
-                        "description": "Category details",
+                        "description": "Published homepage content. Campaign is nullable and sections may be empty.",
                         "content": {
                             "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/Categories"
+                                "schema": {},
+                                "example": {
+                                    "success": true,
+                                    "message": "Success",
+                                    "data": {
+                                        "storefront": {
+                                            "slug": "fragrances",
+                                            "name": "Fragrances"
+                                        },
+                                        "campaign": {
+                                            "id": "01K1ABCDEF1234567890ABCDEF",
+                                            "eyebrow": "After-dark fragrances",
+                                            "title": "Leave a trace.",
+                                            "description": "A magnetic collection for after dark.",
+                                            "desktop_image": "https://cdn.example.com/campaign-desktop.webp",
+                                            "mobile_image": "https://cdn.example.com/campaign-mobile.webp",
+                                            "cta_label": "Shop the campaign",
+                                            "cta_url": "/collections/midnight-edit",
+                                            "starts_at": "2026-08-01T00:00:00.000000Z",
+                                            "ends_at": null
+                                        },
+                                        "sections": [
+                                            {
+                                                "id": "01K1ABCDEF1234567890ABCDEG",
+                                                "type": "featured_products",
+                                                "title": "Currently coveted",
+                                                "subtitle": null,
+                                                "display_order": 1,
+                                                "items": []
+                                            }
+                                        ]
+                                    }
                                 }
                             }
                         }
-                    }
-                }
-            }
-        },
-        "/api/products": {
-            "get": {
-                "tags": [
-                    "Products"
-                ],
-                "summary": "Get products",
-                "operationId": "4a0a1a1c6d1ef74a8b91ec82b2d99934",
-                "parameters": [
-                    {
-                        "name": "category",
-                        "in": "query",
-                        "required": false,
-                        "schema": {
-                            "type": "string"
-                        }
-                    },
-                    {
-                        "name": "brand",
-                        "in": "query",
-                        "required": false,
-                        "schema": {
-                            "type": "string"
-                        }
-                    },
-                    {
-                        "name": "filters[search][$contains]",
-                        "in": "query",
-                        "description": "Search products by name or slug",
-                        "required": false,
-                        "schema": {
-                            "type": "string"
-                        }
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "Paginated product catalog list",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/ProductCatalogResponse"
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        },
-        "/api/product/{slug}": {
-            "get": {
-                "tags": [
-                    "Products"
-                ],
-                "summary": "Get product details",
-                "operationId": "43a99e990fc3434d25e71111598956f0",
-                "parameters": [
-                    {
-                        "name": "slug",
-                        "in": "path",
-                        "required": true,
-                        "schema": {
-                            "type": "string"
-                        }
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "Product details",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/ProductDetail"
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        },
-        "/api/v1/addresses": {
-            "get": {
-                "tags": [
-                    "Addresses"
-                ],
-                "summary": "List customer addresses",
-                "operationId": "listAddresses",
-                "security": [
-                    {
-                        "bearerAuth": []
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "List of addresses",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/AddressListResponse"
-                                }
-                            }
-                        }
-                    },
-                    "401": {
-                        "description": "Unauthenticated"
-                    }
-                }
-            },
-            "post": {
-                "tags": [
-                    "Addresses"
-                ],
-                "summary": "Create a new address",
-                "operationId": "storeAddress",
-                "security": [
-                    {
-                        "bearerAuth": []
-                    }
-                ],
-                "requestBody": {
-                    "required": true,
-                    "content": {
-                        "application/json": {
-                            "schema": {
-                                "$ref": "#/components/schemas/StoreAddressRequest"
-                            }
-                        }
-                    }
-                },
-                "responses": {
-                    "201": {
-                        "description": "Address created",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/AddressResponse"
-                                }
-                            }
-                        }
-                    },
-                    "401": {
-                        "description": "Unauthenticated"
-                    },
-                    "422": {
-                        "description": "Validation error"
-                    }
-                }
-            }
-        },
-        "/api/v1/addresses/{address}": {
-            "get": {
-                "tags": [
-                    "Addresses"
-                ],
-                "summary": "Get a single address",
-                "operationId": "showAddress",
-                "security": [
-                    {
-                        "bearerAuth": []
-                    }
-                ],
-                "parameters": [
-                    {
-                        "name": "address",
-                        "in": "path",
-                        "required": true,
-                        "description": "Address ULID",
-                        "schema": {
-                            "type": "string"
-                        }
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "Address details",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/AddressResponse"
-                                }
-                            }
-                        }
-                    },
-                    "401": {
-                        "description": "Unauthenticated"
                     },
                     "404": {
-                        "description": "Not found"
-                    }
-                }
-            },
-            "patch": {
-                "tags": [
-                    "Addresses"
-                ],
-                "summary": "Update an address",
-                "operationId": "updateAddress",
-                "security": [
-                    {
-                        "bearerAuth": []
-                    }
-                ],
-                "parameters": [
-                    {
-                        "name": "address",
-                        "in": "path",
-                        "required": true,
-                        "description": "Address ULID",
-                        "schema": {
-                            "type": "string"
-                        }
-                    }
-                ],
-                "requestBody": {
-                    "required": true,
-                    "content": {
-                        "application/json": {
-                            "schema": {
-                                "$ref": "#/components/schemas/UpdateAddressRequest"
-                            }
-                        }
-                    }
-                },
-                "responses": {
-                    "200": {
-                        "description": "Address updated",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/AddressResponse"
-                                }
-                            }
-                        }
-                    },
-                    "401": {
-                        "description": "Unauthenticated"
-                    },
-                    "404": {
-                        "description": "Not found"
-                    },
-                    "422": {
-                        "description": "Validation error"
-                    }
-                }
-            },
-            "delete": {
-                "tags": [
-                    "Addresses"
-                ],
-                "summary": "Delete an address",
-                "operationId": "deleteAddress",
-                "security": [
-                    {
-                        "bearerAuth": []
-                    }
-                ],
-                "parameters": [
-                    {
-                        "name": "address",
-                        "in": "path",
-                        "required": true,
-                        "description": "Address ULID",
-                        "schema": {
-                            "type": "string"
-                        }
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "Address deleted"
-                    },
-                    "401": {
-                        "description": "Unauthenticated"
-                    },
-                    "404": {
-                        "description": "Not found"
-                    }
-                }
-            }
-        },
-        "/api/v1/addresses/{address}/default": {
-            "patch": {
-                "tags": [
-                    "Addresses"
-                ],
-                "summary": "Set address as default",
-                "operationId": "setDefaultAddress",
-                "security": [
-                    {
-                        "bearerAuth": []
-                    }
-                ],
-                "parameters": [
-                    {
-                        "name": "address",
-                        "in": "path",
-                        "required": true,
-                        "description": "Address ULID",
-                        "schema": {
-                            "type": "string"
-                        }
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "Default address updated",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/AddressResponse"
-                                }
-                            }
-                        }
-                    },
-                    "401": {
-                        "description": "Unauthenticated"
-                    },
-                    "404": {
-                        "description": "Not found"
+                        "description": "Unknown, inactive, or non-root storefront"
                     }
                 }
             }
@@ -412,6 +94,30 @@
                     "slug": {
                         "type": "string",
                         "example": "st-ives"
+                    },
+                    "description": {
+                        "type": "string",
+                        "example": "A long lipsium ipsium description",
+                        "nullable": true
+                    },
+                    "metaTitle": {
+                        "type": "string",
+                        "example": "A long lipsium ipsium description",
+                        "nullable": true
+                    },
+                    "metaDescription": {
+                        "type": "string",
+                        "example": "A long lipsium ipsium description",
+                        "nullable": true
+                    },
+                    "sortOrder": {
+                        "type": "integer",
+                        "example": 4,
+                        "nullable": true
+                    },
+                    "isActive": {
+                        "type": "boolean",
+                        "example": true
                     }
                 },
                 "type": "object"
@@ -480,8 +186,7 @@
                 },
                 "type": "object"
             },
-            "ProductCatalog": {
-                "title": "Product Catalog",
+            "vendors": {
                 "properties": {
                     "id": {
                         "type": "string",
@@ -489,197 +194,11 @@
                     },
                     "name": {
                         "type": "string",
-                        "example": "Face Scrub"
+                        "example": "Skin Care"
                     },
-                    "slug": {
+                    "business_name": {
                         "type": "string",
-                        "example": "face-scrub",
-                        "nullable": true
-                    },
-                    "category": {
-                        "$ref": "#/components/schemas/Categories"
-                    },
-                    "brand": {
-                        "$ref": "#/components/schemas/Brands"
-                    },
-                    "shortDescription": {
-                        "type": "string",
-                        "example": "Facial scrub lemon fragrance ",
-                        "nullable": true
-                    },
-                    "description": {
-                        "type": "string",
-                        "example": "Facial scrub lemon fragrance with very much more additional info",
-                        "nullable": true
-                    },
-                    "type": {
-                        "example": "variant"
-                    },
-                    "metaTitle": {
-                        "type": "string",
-                        "example": "Facial scrub lemon fragrance",
-                        "nullable": true
-                    },
-                    "metaDescription": {
-                        "type": "string",
-                        "example": "Facial scrub lemon fragrance with very much more additional info",
-                        "nullable": true
-                    },
-                    "isFeatured": {
-                        "type": "boolean",
-                        "example": "true"
-                    },
-                    "price": {
-                        "$ref": "#/components/schemas/Price"
-                    }
-                },
-                "type": "object"
-            },
-            "ProductCatalogFilters": {
-                "properties": {
-                    "search": {
-                        "description": "Search across product name and slug",
-                        "type": "string",
-                        "example": "bathing salts",
-                        "nullable": true
-                    }
-                },
-                "type": "object"
-            },
-            "ProductCatalogResponse": {
-                "properties": {
-                    "data": {
-                        "type": "array",
-                        "items": {
-                            "$ref": "#/components/schemas/ProductCatalog"
-                        }
-                    },
-                    "meta": {
-                        "$ref": "#/components/schemas/PaginationMeta"
-                    }
-                },
-                "type": "object"
-            },
-            "ProductDetail": {
-                "title": "Product Detail",
-                "properties": {
-                    "id": {
-                        "type": "string",
-                        "example": "01J2P9WQZ3YJ6R8X9A2C4D5E6F"
-                    },
-                    "name": {
-                        "type": "string",
-                        "example": "Face Scrub"
-                    },
-                    "slug": {
-                        "type": "string",
-                        "example": "face-scrub"
-                    },
-                    "category": {
-                        "$ref": "#/components/schemas/Categories"
-                    },
-                    "brand": {
-                        "$ref": "#/components/schemas/Brands"
-                    },
-                    "shortDescription": {
-                        "type": "string",
-                        "example": "Facial scrub lemon fragrance ",
-                        "nullable": true
-                    },
-                    "description": {
-                        "type": "string",
-                        "example": "Facial scrub lemon fragrance with very much more additional info",
-                        "nullable": true
-                    },
-                    "type": {
-                        "example": "variant"
-                    },
-                    "status": {
-                        "example": "published"
-                    },
-                    "metaTitle": {
-                        "type": "string",
-                        "example": "facial scrub",
-                        "nullable": true
-                    },
-                    "metaDescription": {
-                        "type": "string",
-                        "example": "very long facial scrub",
-                        "nullable": true
-                    },
-                    "isFeatured": {
-                        "type": "boolean",
-                        "example": "false"
-                    },
-                    "variants": {
-                        "$ref": "#/components/schemas/Variants"
-                    },
-                    "price": {
-                        "$ref": "#/components/schemas/Price"
-                    }
-                },
-                "type": "object"
-            },
-            "Variants": {
-                "properties": {
-                    "id": {
-                        "type": "string",
-                        "example": "01J2P9WQZ3YJ6R8X9A2C4D5E6F"
-                    },
-                    "productId": {
-                        "type": "string",
-                        "example": "01J2P9WQZ3YJ6R8X9A2C4D5E6F"
-                    },
-                    "sku": {
-                        "type": "string",
-                        "example": "FACE-SCRUB-LEM-099009"
-                    },
-                    "isDefault": {
-                        "type": "boolean",
-                        "example": "false"
-                    },
-                    "price": {
-                        "$ref": "#/components/schemas/Price"
-                    },
-                    "salePrice": {
-                        "$ref": "#/components/schemas/Price"
-                    },
-                    "saleStartsAt": {
-                        "type": "string",
-                        "format": "date-time",
-                        "example": "2025-01-01T00:00:00.000000Z"
-                    },
-                    "saleEndsAt": {
-                        "type": "string",
-                        "format": "date-time",
-                        "example": "2025-03-01T00:00:00.000000Z"
-                    },
-                    "manageStock": {
-                        "type": "boolean",
-                        "example": true
-                    },
-                    "stockQuantity": {
-                        "type": "integer",
-                        "example": 10
-                    },
-                    "inStock": {
-                        "type": "boolean",
-                        "example": true
-                    },
-                    "attributes": {
-                        "type": "array",
-                        "items": {
-                            "type": "mixed"
-                        },
-                        "example": "[{'color': 'red', 'size': 'large'}]"
-                    },
-                    "sortOrder": {
-                        "type": "integer",
-                        "example": 1
-                    },
-                    "status": {
-                        "type": "string",
-                        "example": "active"
+                        "example": "Glow Enterprise"
                     }
                 },
                 "type": "object"
@@ -722,233 +241,13 @@
                     }
                 },
                 "type": "object"
-            },
-            "Address": {
-                "properties": {
-                    "id": {
-                        "type": "string",
-                        "example": "01JVABCDE12345678901234567"
-                    },
-                    "label": {
-                        "type": "string",
-                        "example": "Home",
-                        "nullable": true
-                    },
-                    "first_name": {
-                        "type": "string",
-                        "example": "Jane"
-                    },
-                    "last_name": {
-                        "type": "string",
-                        "example": "Doe"
-                    },
-                    "phone": {
-                        "type": "string",
-                        "example": "+2348000000001",
-                        "nullable": true
-                    },
-                    "address_line_1": {
-                        "type": "string",
-                        "example": "12 Bode Thomas Street"
-                    },
-                    "address_line_2": {
-                        "type": "string",
-                        "example": "Flat 3B",
-                        "nullable": true
-                    },
-                    "country": {
-                        "type": "string",
-                        "example": "Nigeria"
-                    },
-                    "state": {
-                        "type": "string",
-                        "example": "Lagos"
-                    },
-                    "city": {
-                        "type": "string",
-                        "example": "Surulere"
-                    },
-                    "postal_code": {
-                        "type": "string",
-                        "example": "101212"
-                    },
-                    "is_default": {
-                        "type": "boolean",
-                        "example": true
-                    }
-                },
-                "type": "object"
-            },
-            "AddressListResponse": {
-                "properties": {
-                    "success": {
-                        "type": "boolean",
-                        "example": true
-                    },
-                    "message": {
-                        "type": "string",
-                        "example": "Success"
-                    },
-                    "data": {
-                        "type": "array",
-                        "items": {
-                            "$ref": "#/components/schemas/Address"
-                        }
-                    }
-                },
-                "type": "object"
-            },
-            "AddressResponse": {
-                "properties": {
-                    "success": {
-                        "type": "boolean",
-                        "example": true
-                    },
-                    "message": {
-                        "type": "string",
-                        "example": "Success"
-                    },
-                    "data": {
-                        "$ref": "#/components/schemas/Address"
-                    }
-                },
-                "type": "object"
-            },
-            "StoreAddressRequest": {
-                "required": [
-                    "first_name",
-                    "last_name",
-                    "address_line_1",
-                    "country",
-                    "state",
-                    "city",
-                    "postal_code"
-                ],
-                "properties": {
-                    "label": {
-                        "type": "string",
-                        "example": "Home",
-                        "nullable": true
-                    },
-                    "first_name": {
-                        "type": "string",
-                        "example": "Jane"
-                    },
-                    "last_name": {
-                        "type": "string",
-                        "example": "Doe"
-                    },
-                    "phone": {
-                        "type": "string",
-                        "example": "+2348000000001",
-                        "nullable": true
-                    },
-                    "address_line_1": {
-                        "type": "string",
-                        "example": "12 Bode Thomas Street"
-                    },
-                    "address_line_2": {
-                        "type": "string",
-                        "example": "Flat 3B",
-                        "nullable": true
-                    },
-                    "country": {
-                        "type": "string",
-                        "example": "Nigeria"
-                    },
-                    "state": {
-                        "type": "string",
-                        "example": "Lagos"
-                    },
-                    "city": {
-                        "type": "string",
-                        "example": "Surulere"
-                    },
-                    "postal_code": {
-                        "type": "string",
-                        "example": "101212"
-                    },
-                    "is_default": {
-                        "type": "boolean",
-                        "example": false,
-                        "nullable": true
-                    }
-                },
-                "type": "object"
-            },
-            "UpdateAddressRequest": {
-                "properties": {
-                    "label": {
-                        "type": "string",
-                        "example": "Home",
-                        "nullable": true
-                    },
-                    "first_name": {
-                        "type": "string",
-                        "example": "Jane"
-                    },
-                    "last_name": {
-                        "type": "string",
-                        "example": "Doe"
-                    },
-                    "phone": {
-                        "type": "string",
-                        "example": "+2348000000001",
-                        "nullable": true
-                    },
-                    "address_line_1": {
-                        "type": "string",
-                        "example": "12 Bode Thomas Street"
-                    },
-                    "address_line_2": {
-                        "type": "string",
-                        "example": "Flat 3B",
-                        "nullable": true
-                    },
-                    "country": {
-                        "type": "string",
-                        "example": "Nigeria"
-                    },
-                    "state": {
-                        "type": "string",
-                        "example": "Lagos"
-                    },
-                    "city": {
-                        "type": "string",
-                        "example": "Surulere"
-                    },
-                    "postal_code": {
-                        "type": "string",
-                        "example": "101212"
-                    },
-                    "is_default": {
-                        "type": "boolean",
-                        "example": false
-                    }
-                },
-                "type": "object"
-            }
-        },
-        "securitySchemes": {
-            "bearerAuth": {
-                "type": "http",
-                "scheme": "bearer",
-                "bearerFormat": "JWT"
             }
         }
     },
     "tags": [
         {
-            "name": "Categories",
-            "description": "Categories"
-        },
-        {
-            "name": "Products",
-            "description": "Products"
-        },
-        {
-            "name": "Addresses",
-            "description": "Customer address management"
+            "name": "Storefront",
+            "description": "Storefront"
         }
     ]
 }

@@ -21,8 +21,10 @@ final class PaymentEntity
         public readonly ?DateTimeImmutable $paidAt,
         public readonly ?DateTimeImmutable $failedAt,
         public readonly array $metadata = [],
-    ) {
-    }
+        public readonly ?string $idempotencyOwner = null,
+        public readonly ?string $idempotencyKey = null,
+        public readonly ?string $idempotencyRequestHash = null,
+    ) {}
 
     public function isPaid(): bool
     {
