@@ -13,11 +13,15 @@ class Order extends Model
     use HasUlids;
 
     public $incrementing = false;
+
     protected $keyType = 'string';
 
     protected $fillable = [
         'user_id',
         'guest_id',
+        'idempotency_owner',
+        'idempotency_key',
+        'idempotency_request_hash',
         'order_number',
         'status',
         'subtotal',
@@ -31,6 +35,7 @@ class Order extends Model
         'billing_address',
         'placed_at',
         'paid_at',
+        'inventory_committed_at',
         'expires_at',
         'cancelled_at',
     ];
@@ -38,16 +43,17 @@ class Order extends Model
     protected function casts(): array
     {
         return [
-            'subtotal'         => 'decimal:2',
-            'shipping_amount'  => 'decimal:2',
-            'total'            => 'decimal:2',
+            'subtotal' => 'decimal:2',
+            'shipping_amount' => 'decimal:2',
+            'total' => 'decimal:2',
             'shipping_address' => 'array',
-            'billing_address'  => 'array',
-            'status'           => OrderStatus::class,
-            'placed_at'        => 'datetime',
-            'paid_at'          => 'datetime',
-            'expires_at'       => 'datetime',
-            'cancelled_at'     => 'datetime',
+            'billing_address' => 'array',
+            'status' => OrderStatus::class,
+            'placed_at' => 'datetime',
+            'paid_at' => 'datetime',
+            'inventory_committed_at' => 'datetime',
+            'expires_at' => 'datetime',
+            'cancelled_at' => 'datetime',
         ];
     }
 

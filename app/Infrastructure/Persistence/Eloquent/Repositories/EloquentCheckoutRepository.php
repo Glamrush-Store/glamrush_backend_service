@@ -4,10 +4,12 @@ namespace App\Infrastructure\Persistence\Eloquent\Repositories;
 
 use App\Domain\Catalog\Cart\CartIdentifier;
 use App\Domain\Catalog\Cart\Exceptions\InsufficientStockException;
+use App\Domain\Catalog\Storefront\StorefrontContext;
 use App\Domain\Order\Actions\GenerateOrderNumberAction;
 use App\Domain\Order\Contracts\CheckoutRepository;
-use App\Domain\Order\Entities\OrderEntity;
+use App\Domain\Order\Entities\CheckoutResult;
 use App\Domain\Shipping\Entities\ShippingAddressEntity;
+use App\Infrastructure\Outbox\OutboxService;
 use App\Infrastructure\Persistence\Eloquent\Mappers\Order\OrderMapper;
 use App\Infrastructure\Persistence\Eloquent\Models\CartItem;
 use App\Infrastructure\Persistence\Eloquent\Models\Order;
@@ -22,8 +24,9 @@ final class EloquentCheckoutRepository implements CheckoutRepository
 {
     public function __construct(
         private readonly GenerateOrderNumberAction $generateOrderNumber,
-    ) {
-    }
+        private readonly StorefrontContext $storefrontContext,
+        private readonly OutboxService $outbox,
+    ) {}
 
     public function createPendingOrderFromCart(
         CartIdentifier $cartIdentifier,
@@ -33,7 +36,10 @@ final class EloquentCheckoutRepository implements CheckoutRepository
         string $shippingRateId,
         string $paymentMethod,
         ?int $userId,
-    ): OrderEntity {
+        string $idempotencyOwner,
+        string $idempotencyKey,
+        string $requestHash,
+    ): CheckoutResult {
         return DB::transaction(function () use (
             $cartIdentifier,
             $shippingAddress,
@@ -41,7 +47,24 @@ final class EloquentCheckoutRepository implements CheckoutRepository
             $billingAddressPayload,
             $shippingRateId,
             $userId,
+            $idempotencyOwner,
+            $idempotencyKey,
+            $requestHash,
         ) {
+            $existing = Order::query()
+                ->where('idempotency_owner', $idempotencyOwner)
+                ->where('idempotency_key', $idempotencyKey)
+                ->with('items')
+                ->first();
+
+            if ($existing !== null) {
+                if (! hash_equals((string) $existing->idempotency_request_hash, $requestHash)) {
+                    throw new RuntimeException('This Idempotency-Key was already used with a different checkout request.');
+                }
+
+                return new CheckoutResult(OrderMapper::toDomain($existing), true);
+            }
+
             $cartItems = $this->loadCartItems($cartIdentifier);
 
             if ($cartItems->isEmpty()) {
@@ -53,18 +76,24 @@ final class EloquentCheckoutRepository implements CheckoutRepository
 
             foreach ($cartItems->sortBy('product_id')->values() as $cartItem) {
                 $product = $cartItem->product;
-                $defaultVariant = $product?->defaultVariant;
+                $selectedVariant = $cartItem->variant ?? $product?->defaultVariant;
 
-                if (!$product || !$defaultVariant) {
+                if (! $product || ! $selectedVariant || $selectedVariant->product_id !== $product->id) {
                     throw new RuntimeException('One or more cart items are no longer available.');
                 }
 
                 $variant = ProductVariant::query()
-                    ->whereKey($defaultVariant->id)
+                    ->whereKey($selectedVariant->id)
+                    ->where('product_id', $product->id)
+                    ->whereIn('status', ProductVariant::SELLABLE_STATUSES)
                     ->lockForUpdate()
-                    ->firstOrFail();
+                    ->first();
 
-                $availableQuantity = (int)$variant->stock_quantity - (int)$variant->reserved_quantity;
+                if (! $variant) {
+                    throw new RuntimeException('One or more selected product variants are no longer available.');
+                }
+
+                $availableQuantity = (int) $variant->stock_quantity - (int) $variant->reserved_quantity;
 
                 if ($availableQuantity < $cartItem->quantity) {
                     throw new InsufficientStockException(
@@ -82,7 +111,7 @@ final class EloquentCheckoutRepository implements CheckoutRepository
                 $reservedItems[] = [
                     'product' => $product,
                     'variant' => $variant,
-                    'quantity' => (int)$cartItem->quantity,
+                    'quantity' => (int) $cartItem->quantity,
                     'unit_price' => $unitPrice,
                     'line_total' => $lineTotal,
                 ];
@@ -99,6 +128,9 @@ final class EloquentCheckoutRepository implements CheckoutRepository
             $order = Order::create([
                 'user_id' => $userId,
                 'guest_id' => $cartIdentifier->cartToken,
+                'idempotency_owner' => $idempotencyOwner,
+                'idempotency_key' => $idempotencyKey,
+                'idempotency_request_hash' => $requestHash,
                 'order_number' => $this->generateOrderNumber->run(),
                 'status' => 'pending_payment',
                 'subtotal' => $subtotal,
@@ -134,12 +166,24 @@ final class EloquentCheckoutRepository implements CheckoutRepository
                         'slug' => $product->slug,
                         'sku' => $variant->sku,
                         'price' => $reserved['unit_price'],
+                        'attributes' => $variant->attributes ?? [],
                         'images' => $this->orderItemImages($variant, $product),
                     ],
                 ]);
             }
 
-            return OrderMapper::toDomain($order->load('items'));
+            CartItem::query()
+                ->tap(fn (Builder $query) => $this->constrainCart($query, $cartIdentifier))
+                ->whereKey($cartItems->modelKeys())
+                ->delete();
+
+            $this->outbox->record(
+                "order:{$order->id}:placed",
+                'order.placed',
+                ['order_id' => (string) $order->id],
+            );
+
+            return new CheckoutResult(OrderMapper::toDomain($order->load('items')), false);
         });
     }
 
@@ -147,10 +191,16 @@ final class EloquentCheckoutRepository implements CheckoutRepository
     {
         return CartItem::query()
             ->with([
-                'product' => fn($query) => $query->withoutGlobalScopes()->with('media'),
+                'product' => fn ($query) => $query->withoutGlobalScopes()->with('media'),
                 'product.defaultVariant.media',
+                'variant.media',
             ])
-            ->tap(fn(Builder $query) => $this->constrainCart($query, $cartIdentifier))
+            ->tap(fn (Builder $query) => $this->constrainCart($query, $cartIdentifier))
+            ->when($this->storefrontContext->isActive(), function (Builder $query) {
+                $query->whereHas('product', fn (Builder $productQuery) => $productQuery
+                    ->withoutGlobalScopes()
+                    ->whereIn('category_id', $this->storefrontContext->categoryIds()));
+            })
             ->get();
     }
 
@@ -172,7 +222,7 @@ final class EloquentCheckoutRepository implements CheckoutRepository
     ): ShippingRate {
         $zone = $this->findBestZoneForAddress($shippingAddress);
 
-        if (!$zone) {
+        if (! $zone) {
             throw new RuntimeException('No shipping zone is available for this address.');
         }
 
@@ -180,19 +230,19 @@ final class EloquentCheckoutRepository implements CheckoutRepository
             ->whereKey($shippingRateId)
             ->where('shipping_zone_id', $zone->id)
             ->where('is_active', true)
-            ->whereHas('method', fn($query) => $query->where('is_active', true))
+            ->whereHas('method', fn ($query) => $query->where('is_active', true))
             ->with(['zone', 'method'])
             ->first();
 
-        if (!$rate) {
+        if (! $rate) {
             throw new RuntimeException('The selected shipping option is no longer available.');
         }
 
-        if ($rate->min_order_amount !== null && $cartSubtotal < (float)$rate->min_order_amount) {
+        if ($rate->min_order_amount !== null && $cartSubtotal < (float) $rate->min_order_amount) {
             throw new RuntimeException('The selected shipping option requires a higher cart subtotal.');
         }
 
-        if ($rate->max_order_amount !== null && $cartSubtotal > (float)$rate->max_order_amount) {
+        if ($rate->max_order_amount !== null && $cartSubtotal > (float) $rate->max_order_amount) {
             throw new RuntimeException('The selected shipping option is not available for this cart subtotal.');
         }
 
@@ -246,12 +296,12 @@ final class EloquentCheckoutRepository implements CheckoutRepository
     {
         if (
             $rate->free_over_amount !== null &&
-            $cartSubtotal >= (float)$rate->free_over_amount
+            $cartSubtotal >= (float) $rate->free_over_amount
         ) {
             return 0.0;
         }
 
-        return (float)$rate->amount;
+        return (float) $rate->amount;
     }
 
     private function effectiveVariantPrice(ProductVariant $variant): float
@@ -269,16 +319,16 @@ final class EloquentCheckoutRepository implements CheckoutRepository
             $saleStarted &&
             $saleNotEnded
         ) {
-            return (float)$variant->sale_price;
+            return (float) $variant->sale_price;
         }
 
-        return (float)$variant->price;
+        return (float) $variant->price;
     }
 
     private function orderItemImages(ProductVariant $variant, $product): array
     {
         $variantImages = $variant->getMedia('catalog-photos')
-            ->map(fn($media) => [
+            ->map(fn ($media) => [
                 'id' => $media->id,
                 'name' => $media->name,
                 'url' => $media->getUrl(),
@@ -292,7 +342,7 @@ final class EloquentCheckoutRepository implements CheckoutRepository
         }
 
         return $product->getMedia('catalog-photos')
-            ->map(fn($media) => [
+            ->map(fn ($media) => [
                 'id' => $media->id,
                 'name' => $media->name,
                 'url' => $media->getUrl(),

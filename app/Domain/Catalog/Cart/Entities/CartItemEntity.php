@@ -9,6 +9,9 @@ final class CartItemEntity
     public function __construct(
         public readonly int $id,
         public readonly string $productId,
+        public readonly ?string $productVariantId,
+        public readonly ?string $sku,
+        public readonly array $attributes,
         public readonly string $name,
         public readonly string $slug,
         public readonly ?string $thumb,

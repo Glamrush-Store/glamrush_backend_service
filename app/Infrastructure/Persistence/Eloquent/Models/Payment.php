@@ -12,10 +12,14 @@ class Payment extends Model
     use HasUlids;
 
     public $incrementing = false;
+
     protected $keyType = 'string';
 
     protected $fillable = [
         'order_id',
+        'idempotency_owner',
+        'idempotency_key',
+        'idempotency_request_hash',
         'payment_method_id',
         'provider',
         'reference',

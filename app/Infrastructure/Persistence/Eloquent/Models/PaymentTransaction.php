@@ -11,10 +11,12 @@ class PaymentTransaction extends Model
     use HasUlids;
 
     public $incrementing = false;
+
     protected $keyType = 'string';
 
     protected $fillable = [
         'payment_id',
+        'event_key',
         'type',
         'status',
         'provider_reference',

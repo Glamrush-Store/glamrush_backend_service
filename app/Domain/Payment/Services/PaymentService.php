@@ -3,15 +3,18 @@
 namespace App\Domain\Payment\Services;
 
 use App\Domain\Order\Contracts\OrderRepository;
-use App\Domain\Order\Events\OrderPaid;
-use App\Domain\Order\Events\OrderPendingOnDelivery;
 use App\Domain\Payment\Actions\GeneratePaymentReferenceAction;
 use App\Domain\Payment\Contracts\PaymentMethodRepository;
 use App\Domain\Payment\Contracts\PaymentRepository;
+use App\Domain\Payment\Entities\PaymentEntity;
 use App\Domain\Payment\Entities\PaymentInitializationEntity;
 use App\Domain\Payment\Enums\PaymentStatus;
-use App\Domain\Payment\Events\PaymentFailed;
+use App\Infrastructure\Outbox\OutboxService;
 use App\Infrastructure\Payment\PaymentGatewayResolver;
+use App\Shared\Idempotency\IdempotencyLock;
+use App\Shared\Idempotency\IdempotencyOwner;
+use Illuminate\Database\UniqueConstraintViolationException;
+use Illuminate\Support\Facades\DB;
 use RuntimeException;
 
 final class PaymentService
@@ -22,58 +25,116 @@ final class PaymentService
         private readonly PaymentRepository $payments,
         private readonly PaymentGatewayResolver $gatewayResolver,
         private readonly GeneratePaymentReferenceAction $generatePaymentReference,
-    ) {
-    }
+        private readonly IdempotencyLock $idempotencyLock,
+        private readonly OutboxService $outbox,
+    ) {}
 
-    public function initialize(string $orderId, string $paymentMethodCode): PaymentInitializationEntity
-    {
-        $order = $this->orders->findById($orderId);
+    public function initialize(
+        string $orderId,
+        string $paymentMethodCode,
+        ?int $userId,
+        ?string $guestToken,
+        string $idempotencyKey,
+        string $requestHash,
+    ): PaymentInitializationEntity {
+        $owner = IdempotencyOwner::from($userId, $guestToken);
+        $order = $this->orders->findByIdForOwner($orderId, $userId, $guestToken);
 
         if ($order === null) {
-            throw new RuntimeException('Order not found.');
+            throw new RuntimeException('Order not found or does not belong to this customer.');
         }
 
-        if (! $order->isPendingPayment()) {
-            throw new RuntimeException('Only pending payment orders can be paid.');
-        }
+        return $this->idempotencyLock->run(
+            "payment-initialize:{$orderId}",
+            $owner,
+            'order-initialization',
+            function () use ($orderId, $paymentMethodCode, $userId, $guestToken, $owner, $idempotencyKey, $requestHash) {
+                $order = $this->orders->findByIdForOwner($orderId, $userId, $guestToken);
 
-        $method = $this->methods->findActiveByCode($paymentMethodCode);
+                if ($order === null) {
+                    throw new RuntimeException('Order not found or does not belong to this customer.');
+                }
 
-        if ($method === null) {
-            throw new RuntimeException('Payment method is not available.');
-        }
+                $payment = $this->payments->findByIdempotency($owner, $idempotencyKey);
+                $replayed = $payment !== null;
 
-        $gateway = $this->gatewayResolver->resolve($method->code);
-        $payment = $this->payments->createPending(
-            order: $order,
-            method: $method,
-            reference: $this->generatePaymentReference->run(),
-        );
+                if ($payment !== null) {
+                    if (! hash_equals((string) $payment->idempotencyRequestHash, $requestHash)) {
+                        throw new RuntimeException('This Idempotency-Key was already used with a different payment request.');
+                    }
 
-        $initialization = $gateway->initialize($order, $payment, $method);
+                    if ($payment->authorizationUrl !== null || $payment->status !== PaymentStatus::PENDING->value) {
+                        return $this->initializationResponse($payment, true);
+                    }
+                }
 
-        $payment = $this->payments->updateInitialized(
-            paymentId: $payment->id,
-            authorizationUrl: $initialization->authorizationUrl,
-            status: $initialization->status,
-            metadata: [
-                'access_code' => $initialization->accessCode,
-                'initialization_status' => $initialization->status,
-            ],
-        );
+                if (! $order->isPendingPayment()) {
+                    throw new RuntimeException('Only pending payment orders can be paid.');
+                }
 
-        if ($initialization->status === PaymentStatus::PENDING_ON_DELIVERY->value) {
-            $this->orders->markAsPendingOnDelivery($order->id);
-            event(new OrderPendingOnDelivery($order->id, $payment->id));
-        }
+                $method = $this->methods->findActiveByCode($paymentMethodCode);
 
-        return new PaymentInitializationEntity(
-            payment: $payment,
-            authorizationUrl: $initialization->authorizationUrl,
-            accessCode: $initialization->accessCode,
-            reference: $initialization->reference,
-            provider: $initialization->provider,
-            status: $initialization->status,
+                if ($method === null) {
+                    throw new RuntimeException('Payment method is not available.');
+                }
+
+                $gateway = $this->gatewayResolver->resolve($method->code);
+
+                if ($payment === null) {
+                    try {
+                        $payment = $this->payments->createPending(
+                            order: $order,
+                            method: $method,
+                            reference: $this->generatePaymentReference->run(),
+                            idempotencyOwner: $owner,
+                            idempotencyKey: $idempotencyKey,
+                            requestHash: $requestHash,
+                        );
+                    } catch (UniqueConstraintViolationException) {
+                        $payment = $this->payments->findByIdempotency($owner, $idempotencyKey);
+
+                        if ($payment === null || ! hash_equals((string) $payment->idempotencyRequestHash, $requestHash)) {
+                            throw new RuntimeException('Unable to safely resume this payment request.');
+                        }
+
+                        $replayed = true;
+                    }
+                }
+
+                $initialization = $gateway->initialize($order, $payment, $method);
+
+                $payment = $this->payments->updateInitialized(
+                    paymentId: $payment->id,
+                    authorizationUrl: $initialization->authorizationUrl,
+                    status: $initialization->status,
+                    metadata: [
+                        'access_code' => $initialization->accessCode,
+                        'initialization_status' => $initialization->status,
+                    ],
+                );
+
+                if ($initialization->status === PaymentStatus::PENDING_ON_DELIVERY->value) {
+                    DB::transaction(function () use ($order, $payment): void {
+                        if ($this->orders->markAsPendingOnDelivery($order->id)) {
+                            $this->outbox->record(
+                                "order:{$order->id}:pending-on-delivery",
+                                'order.pending_on_delivery',
+                                ['order_id' => $order->id, 'payment_id' => $payment->id],
+                            );
+                        }
+                    });
+                }
+
+                return new PaymentInitializationEntity(
+                    payment: $payment,
+                    authorizationUrl: $initialization->authorizationUrl,
+                    accessCode: $initialization->accessCode,
+                    reference: $initialization->reference,
+                    provider: $initialization->provider,
+                    status: $initialization->status,
+                    replayed: $replayed,
+                );
+            },
         );
     }
 
@@ -86,67 +147,69 @@ final class PaymentService
             throw new RuntimeException('Payment reference not found in gateway verification response.');
         }
 
-        $payment = $this->payments->findByReference($verification->reference);
+        return DB::transaction(function () use ($provider, $transactionId, $verification): PaymentInitializationEntity {
+            $payment = $this->payments->findByReferenceForUpdate($verification->reference);
 
-        if ($payment === null) {
-            throw new RuntimeException('Payment not found.');
-        }
-
-        if ($payment->provider !== $provider) {
-            throw new RuntimeException('Payment provider mismatch.');
-        }
-
-        $this->payments->recordTransaction(
-            paymentId: $payment->id,
-            type: 'verify',
-            status: $verification->status,
-            providerReference: $verification->providerReference,
-            amount: $verification->amount,
-            currency: $verification->currency,
-            payload: $verification->payload,
-        );
-
-        if ($verification->succeeded() && ! $payment->isPaid()) {
-            if ($verification->amount !== null && round($verification->amount, 2) !== round($payment->amount, 2)) {
-                throw new RuntimeException('Payment amount mismatch.');
+            if ($payment === null) {
+                throw new RuntimeException('Payment not found.');
             }
 
-            if ($verification->currency !== null && $verification->currency !== $payment->currency) {
-                throw new RuntimeException('Payment currency mismatch.');
+            if ($payment->provider !== $provider) {
+                throw new RuntimeException('Payment provider mismatch.');
             }
 
-            $payment = $this->payments->markAsPaid(
+            $eventBase = "provider:{$provider}:transaction:{$transactionId}";
+            $this->payments->recordTransaction(
                 paymentId: $payment->id,
+                type: 'verify',
+                status: $verification->status,
                 providerReference: $verification->providerReference,
-                transactionId: $verification->transactionId,
+                amount: $verification->amount,
+                currency: $verification->currency,
                 payload: $verification->payload,
+                eventKey: "{$eventBase}:verify",
             );
 
-            $this->orders->markAsPaid($payment->orderId);
-            event(new OrderPaid($payment->orderId));
-        }
+            if ($verification->succeeded()) {
+                $this->assertVerifiedTotals($payment, $verification->amount, $verification->currency);
 
-        if (
-            ! $verification->succeeded() &&
-            in_array($payment->status, [PaymentStatus::PENDING->value, PaymentStatus::INITIALIZED->value], true)
-        ) {
-            $payment = $this->payments->markAsFailed(
-                paymentId: $payment->id,
-                providerReference: $verification->providerReference,
-                transactionId: $verification->transactionId,
-                payload: $verification->payload,
-            );
-            event(new PaymentFailed($payment->id));
-        }
+                if (! $payment->isPaid()) {
+                    try {
+                        $payment = $this->payments->markAsPaid(
+                            paymentId: $payment->id,
+                            providerReference: $verification->providerReference,
+                            transactionId: $verification->transactionId,
+                            payload: $verification->payload,
+                        );
+                    } catch (UniqueConstraintViolationException) {
+                        throw new RuntimeException('This provider transaction has already been applied to another payment.');
+                    }
+                }
 
-        return new PaymentInitializationEntity(
-            payment: $payment,
-            authorizationUrl: $payment->authorizationUrl,
-            accessCode: $payment->metadata['access_code'] ?? null,
-            reference: $payment->reference,
-            provider: $payment->provider,
-            status: $payment->status,
-        );
+                if ($this->orders->markPaidAndCommitInventory($payment->orderId)) {
+                    $this->outbox->record(
+                        "order:{$payment->orderId}:paid",
+                        'order.paid',
+                        ['order_id' => $payment->orderId],
+                    );
+                }
+            } elseif (in_array($payment->status, [PaymentStatus::PENDING->value, PaymentStatus::INITIALIZED->value], true)) {
+                $payment = $this->payments->markAsFailed(
+                    paymentId: $payment->id,
+                    providerReference: $verification->providerReference,
+                    transactionId: $verification->transactionId,
+                    payload: $verification->payload,
+                );
+
+                $this->outbox->record(
+                    "payment:{$payment->id}:failed",
+                    'payment.failed',
+                    ['payment_id' => $payment->id],
+                );
+            }
+
+            return $this->initializationResponse($payment, false);
+        });
     }
 
     public function handleWebhook(string $provider, string $rawPayload, ?string $signature): void
@@ -165,5 +228,29 @@ final class PaymentService
         }
 
         $this->verify($provider, $transactionId);
+    }
+
+    private function assertVerifiedTotals(PaymentEntity $payment, ?float $amount, ?string $currency): void
+    {
+        if ($amount !== null && round($amount, 2) !== round($payment->amount, 2)) {
+            throw new RuntimeException('Payment amount mismatch.');
+        }
+
+        if ($currency !== null && $currency !== $payment->currency) {
+            throw new RuntimeException('Payment currency mismatch.');
+        }
+    }
+
+    private function initializationResponse(PaymentEntity $payment, bool $replayed): PaymentInitializationEntity
+    {
+        return new PaymentInitializationEntity(
+            payment: $payment,
+            authorizationUrl: $payment->authorizationUrl,
+            accessCode: $payment->metadata['access_code'] ?? null,
+            reference: $payment->reference,
+            provider: $payment->provider,
+            status: $payment->status,
+            replayed: $replayed,
+        );
     }
 }

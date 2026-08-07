@@ -8,6 +8,7 @@
 
 namespace App\Domain\Catalog\Product\Queries;
 
+use App\Infrastructure\Caching\CacheTags;
 use App\Shared\Contracts\Caching\CacheableQuery;
 
 final class ListProductsQuery implements CacheableQuery
@@ -26,6 +27,7 @@ final class ListProductsQuery implements CacheableQuery
         public ?string $search = null,
         public int $page = 1,
         public int $perPage = 20,
+        public ?string $storefrontRootSlug = null,
     ) {}
 
     public function cacheKey(): string
@@ -44,12 +46,13 @@ final class ListProductsQuery implements CacheableQuery
             'maxPrice' => $this->maxPrice,
             'search' => $this->search,
             'perPage' => $this->perPage,
+            'storefrontRootSlug' => $this->storefrontRootSlug,
         ]));
     }
 
     public function cacheTags(): array
     {
-        return ['catalog', 'products'];
+        return [CacheTags::CATALOG, CacheTags::PRODUCTS];
     }
 
     public function ttl(): int

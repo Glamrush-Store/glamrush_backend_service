@@ -6,6 +6,7 @@ use App\Domain\Shipping\Entities\ShippingMethodEntity;
 use App\Domain\Shipping\Entities\ShippingRateEntity;
 use App\Domain\Shipping\Entities\ShippingZoneEntity;
 use App\Domain\Shipping\Services\ShippingQuoteService;
+use App\Presentation\Http\Resources\Shipping\ShippingOptionResource;
 
 function shippingFakeRepository(?ShippingZoneEntity $zone, array $rates): ShippingRepository
 {
@@ -176,4 +177,23 @@ it('filters out rates when the cart subtotal is outside the allowed order range'
     expect($options)->toHaveCount(1)
         ->and($options[0]->rateId)->toBe('rate_available')
         ->and($options[0]->amount)->toBe(3500.0);
+});
+
+it('serializes shipping option labels as text instead of nested objects', function () {
+    $zone = shippingZone();
+    $method = shippingMethod();
+    $option = (new ShippingQuoteService(
+        shippingFakeRepository($zone, [shippingRate($zone, $method)])
+    ))->getShippingOptions(
+        new ShippingAddressEntity('Nigeria', 'Lagos', 'Ikeja', null),
+        cartSubtotal: 15000.0,
+    )[0];
+
+    $payload = (new ShippingOptionResource($option))->resolve(request());
+
+    expect($payload)
+        ->method->toBe('Standard Delivery')
+        ->method_code->toBe('standard')
+        ->description->toBe('Standard delivery')
+        ->zone->toBe('Lagos');
 });

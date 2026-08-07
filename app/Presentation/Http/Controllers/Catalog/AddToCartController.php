@@ -4,6 +4,7 @@ namespace App\Presentation\Http\Controllers\Catalog;
 
 use App\Domain\Catalog\Cart\CartIdentifier;
 use App\Domain\Catalog\Cart\Exceptions\InsufficientStockException;
+use App\Domain\Catalog\Cart\Exceptions\InvalidCartSelectionException;
 use App\Domain\Catalog\Cart\Services\CartService;
 use App\Presentation\Http\Requests\Cart\AddToCartRequest;
 use App\Presentation\Http\Resources\Catalog\CartItemResource;
@@ -23,9 +24,10 @@ final class AddToCartController
             $result = $this->service->add(
                 $id,
                 $request->validated('product_id'),
+                $request->validated('product_variant_id'),
                 (int) ($request->validated('quantity') ?? 1),
             );
-        } catch (InsufficientStockException $e) {
+        } catch (InsufficientStockException|InvalidCartSelectionException $e) {
             return response()->json(['success' => false, 'message' => $e->getMessage()], 422);
         }
 
@@ -51,9 +53,9 @@ final class AddToCartController
     private function cartResponse(CartIdentifier $id, mixed $data, int $status): JsonResponse
     {
         return response()->json([
-            'success'    => true,
-            'message'    => 'Success',
-            'data'       => $data,
+            'success' => true,
+            'message' => 'Success',
+            'data' => $data,
             'cart_token' => $id->isGuest() ? $id->cartToken : null,
         ], $status);
     }

@@ -3,7 +3,9 @@
 namespace App\Presentation\Http\Controllers\Catalog;
 
 use App\Domain\Catalog\Cart\CartIdentifier;
+use App\Domain\Catalog\Cart\Exceptions\AmbiguousCartItemException;
 use App\Domain\Catalog\Cart\Exceptions\InsufficientStockException;
+use App\Domain\Catalog\Cart\Exceptions\InvalidCartSelectionException;
 use App\Domain\Catalog\Cart\Services\CartService;
 use App\Presentation\Http\Requests\Cart\UpdateCartItemRequest;
 use App\Presentation\Http\Resources\Catalog\CartItemResource;
@@ -15,18 +17,20 @@ final class UpdateCartItemController
         private readonly CartService $service,
     ) {}
 
-    public function __invoke(UpdateCartItemRequest $request, string $productId): JsonResponse
+    public function __invoke(UpdateCartItemRequest $request): JsonResponse
     {
         $id = $this->resolveIdentifier($request);
 
         try {
             $entity = $this->service->update(
                 $id,
-                $productId,
+                (string) $request->route('productId'),
                 (int) $request->validated('quantity'),
             );
-        } catch (InsufficientStockException $e) {
+        } catch (InsufficientStockException|InvalidCartSelectionException $e) {
             return response()->json(['success' => false, 'message' => $e->getMessage()], 422);
+        } catch (AmbiguousCartItemException $e) {
+            return response()->json(['success' => false, 'message' => $e->getMessage()], 409);
         }
 
         return $this->cartResponse($id, new CartItemResource($entity), 200);
@@ -44,9 +48,9 @@ final class UpdateCartItemController
     private function cartResponse(CartIdentifier $id, mixed $data, int $status): JsonResponse
     {
         return response()->json([
-            'success'    => true,
-            'message'    => 'Success',
-            'data'       => $data,
+            'success' => true,
+            'message' => 'Success',
+            'data' => $data,
             'cart_token' => $id->isGuest() ? $id->cartToken : null,
         ], $status);
     }

@@ -10,6 +10,7 @@ namespace App\Infrastructure\Persistence\Eloquent\Repositories;
 
 use App\Domain\Catalog\Product\Contracts\ProductRepository;
 use App\Domain\Catalog\Product\Entities\ProductEntity;
+use App\Domain\Catalog\Product\Queries\GetProductQuery;
 use App\Domain\Catalog\Product\Queries\ListProductsQuery;
 use App\Infrastructure\Persistence\Eloquent\Enrichers\VariantAttributeEnricher;
 use App\Infrastructure\Persistence\Eloquent\Mappers\Catalog\ProductMapper;
@@ -34,10 +35,9 @@ final class EloquentProductRepository implements ProductRepository
 
     public function __construct(
         private readonly VariantAttributeEnricher $enricher,
-    ) {
-    }
+    ) {}
 
-    public function findBySlug(string $slug): ?ProductEntity
+    public function findBySlug(GetProductQuery $query): ?ProductEntity
     {
         $model = Product::query()
             ->select([
@@ -64,7 +64,15 @@ final class EloquentProductRepository implements ProductRepository
                 'products.category_id',
                 'products.brand_id',
             ])
-            ->where('slug', $slug)
+            ->where('slug', $query->slug)
+            ->when($query->storefrontRootSlug, function (Builder $builder, string $rootSlug) {
+                $root = Category::query()->where('slug', $rootSlug)->first();
+
+                $builder->whereIn(
+                    'products.category_id',
+                    $root ? $this->getCategoryDescendantIds($root, activeOnly: true) : [],
+                );
+            })
             ->with([
                 'category:id,name,slug,is_active',
                 'brand:id,name,slug',
@@ -73,7 +81,7 @@ final class EloquentProductRepository implements ProductRepository
             ])
             ->first();
 
-        if (!$model) {
+        if (! $model) {
             return null;
         }
 
@@ -119,7 +127,7 @@ final class EloquentProductRepository implements ProductRepository
 
         $paginator->setCollection(
             $paginator->getCollection()
-                ->map(fn($model) => ProductMapper::toDomain($model))
+                ->map(fn ($model) => ProductMapper::toDomain($model))
         );
 
         return $paginator;
@@ -127,7 +135,15 @@ final class EloquentProductRepository implements ProductRepository
 
     private function constrainQuery(Builder $builder, ListProductsQuery $query, array $exclude = []): void
     {
-        if (!in_array('category', $exclude) && $query->categorySlug) {
+        if ($query->storefrontRootSlug) {
+            $root = Category::query()->where('slug', $query->storefrontRootSlug)->first();
+            $builder->whereIn(
+                'products.category_id',
+                $root ? $this->getCategoryDescendantIds($root, activeOnly: true) : [],
+            );
+        }
+
+        if (! in_array('category', $exclude) && $query->categorySlug) {
             $category = Category::where('slug', $query->categorySlug)->first();
             if ($category) {
                 $ids = $this->getCategoryDescendantIds($category);
@@ -135,23 +151,23 @@ final class EloquentProductRepository implements ProductRepository
             }
         }
 
-        if (!in_array('brand', $exclude) && $query->brandSlug) {
-            $builder->whereHas('brand', fn($q) => $q->where('slug', $query->brandSlug));
+        if (! in_array('brand', $exclude) && $query->brandSlug) {
+            $builder->whereHas('brand', fn ($q) => $q->where('slug', $query->brandSlug));
         }
 
-        if (!in_array('collection', $exclude) && $query->collectionSlug) {
-            $builder->whereHas('collections', fn($q) => $q->where('collections.slug', $query->collectionSlug));
+        if (! in_array('collection', $exclude) && $query->collectionSlug) {
+            $builder->whereHas('collections', fn ($q) => $q->where('collections.slug', $query->collectionSlug));
         }
 
-        if (!in_array('featured', $exclude) && !is_null($query->featured)) {
+        if (! in_array('featured', $exclude) && ! is_null($query->featured)) {
             $builder->where('is_featured', $query->featured);
         }
 
-        if (!in_array('onSale', $exclude) && !is_null($query->onSale)) {
+        if (! in_array('onSale', $exclude) && ! is_null($query->onSale)) {
             $this->constrainOnSale($builder, $query->onSale);
         }
 
-        if (!in_array('price', $exclude) && ($query->minPrice || $query->maxPrice)) {
+        if (! in_array('price', $exclude) && ($query->minPrice || $query->maxPrice)) {
             $builder->whereHas('defaultVariant', function ($q) use ($query) {
                 if ($query->minPrice) {
                     $q->where('price', '>=', $query->minPrice);
@@ -162,18 +178,29 @@ final class EloquentProductRepository implements ProductRepository
             });
         }
 
-        if (!in_array('search', $exclude) && $query->search) {
-            $search = $query->search;
-            $builder->where(fn($q) => $q
-                ->where('products.name', 'like', "%{$search}%")
-                ->orWhere('products.slug', 'like', "%{$search}%")
-            );
+        if (! in_array('search', $exclude) && $query->search) {
+            $terms = preg_split('/\s+/', mb_strtolower(trim($query->search))) ?: [];
+
+            foreach (array_filter($terms) as $term) {
+                $like = "%{$term}%";
+
+                $builder->where(fn (Builder $searchQuery) => $searchQuery
+                    ->whereRaw('LOWER(products.name) LIKE ?', [$like])
+                    ->orWhereRaw('LOWER(products.slug) LIKE ?', [$like])
+                    ->orWhereRaw("LOWER(COALESCE(products.sku, '')) LIKE ?", [$like])
+                    ->orWhereRaw("LOWER(COALESCE(products.short_description, '')) LIKE ?", [$like])
+                    ->orWhereHas('brand', fn (Builder $brandQuery) => $brandQuery
+                        ->whereRaw('LOWER(brands.name) LIKE ?', [$like]))
+                    ->orWhereHas('category', fn (Builder $categoryQuery) => $categoryQuery
+                        ->whereRaw('LOWER(categories.name) LIKE ?', [$like]))
+                );
+            }
         }
 
-        if (!in_array('attributes', $exclude)) {
+        if (! in_array('attributes', $exclude)) {
             // dd("attributes");
             $has = $query->filters['attributes']['$has'] ?? null;
-            if (!empty($has)) {
+            if (! empty($has)) {
                 // Normalize: single object → wrap in array
                 $conditions = isset($has['type']) ? [$has] : array_values($has);
 
@@ -182,19 +209,23 @@ final class EloquentProductRepository implements ProductRepository
                         continue;
                     }
                     $json = json_encode([['type' => $condition['type'], 'value' => $condition['value']]]);
-                    $builder->whereHas('variants', fn($q) => $q->whereRaw('attributes::jsonb @> ?::jsonb', [$json]));
+                    $builder->whereHas('variants', fn ($q) => $q->whereRaw('attributes::jsonb @> ?::jsonb', [$json]));
                 }
             }
         }
     }
 
-    private function getCategoryDescendantIds(Category $category): array
+    private function getCategoryDescendantIds(Category $category, bool $activeOnly = false): array
     {
         $ids = [$category->id];
         $category->load('childrenRecursive');
 
-        $collect = function (Category $node) use (&$collect, &$ids): void {
+        $collect = function (Category $node) use (&$collect, &$ids, $activeOnly): void {
             foreach ($node->childrenRecursive as $child) {
+                if ($activeOnly && ! $child->is_active) {
+                    continue;
+                }
+
                 $ids[] = $child->id;
                 $collect($child);
             }
@@ -267,7 +298,7 @@ final class EloquentProductRepository implements ProductRepository
     private function getPriceRangeFacet(ListProductsQuery $query): array
     {
         $productIds = Product::query()
-            ->tap(fn(Builder $q) => $this->constrainQuery($q, $query, ['price']))
+            ->tap(fn (Builder $q) => $this->constrainQuery($q, $query, ['price']))
             ->pluck('products.id');
 
         if ($productIds->isEmpty()) {
@@ -279,15 +310,15 @@ final class EloquentProductRepository implements ProductRepository
             ->first();
 
         return [
-            'min' => (float)($result->min_price ?? 0),
-            'max' => (float)($result->max_price ?? 0),
+            'min' => (float) ($result->min_price ?? 0),
+            'max' => (float) ($result->max_price ?? 0),
         ];
     }
 
     private function getBrandFacets(ListProductsQuery $query): array
     {
         $productIds = Product::query()
-            ->tap(fn(Builder $q) => $this->constrainQuery($q, $query, ['brand']))
+            ->tap(fn (Builder $q) => $this->constrainQuery($q, $query, ['brand']))
             ->pluck('products.id');
 
         if ($productIds->isEmpty()) {
@@ -301,11 +332,11 @@ final class EloquentProductRepository implements ProductRepository
             ->groupBy('brands.id', 'brands.name', 'brands.slug')
             ->orderByDesc('count')
             ->get()
-            ->map(fn($row) => [
+            ->map(fn ($row) => [
                 'id' => $row->id,
                 'name' => $row->name,
                 'slug' => $row->slug,
-                'count' => (int)$row->count,
+                'count' => (int) $row->count,
             ])
             ->values()
             ->toArray();
@@ -314,7 +345,7 @@ final class EloquentProductRepository implements ProductRepository
     private function getCategoryFacets(ListProductsQuery $query): array
     {
         $productIds = Product::query()
-            ->tap(fn(Builder $q) => $this->constrainQuery($q, $query, ['category']))
+            ->tap(fn (Builder $q) => $this->constrainQuery($q, $query, ['category']))
             ->pluck('products.id');
 
         if ($productIds->isEmpty()) {
@@ -336,11 +367,11 @@ final class EloquentProductRepository implements ProductRepository
         }
 
         return $categoryQuery->get()
-            ->map(fn($row) => [
+            ->map(fn ($row) => [
                 'id' => $row->id,
                 'name' => $row->name,
                 'slug' => $row->slug,
-                'count' => (int)$row->count,
+                'count' => (int) $row->count,
             ])
             ->values()
             ->toArray();
@@ -349,7 +380,7 @@ final class EloquentProductRepository implements ProductRepository
     private function getAttributeFacets(ListProductsQuery $query): array
     {
         $productIds = Product::query()
-            ->tap(fn(Builder $q) => $this->constrainQuery($q, $query))
+            ->tap(fn (Builder $q) => $this->constrainQuery($q, $query))
             ->pluck('products.id');
 
         if ($productIds->isEmpty()) {
@@ -366,12 +397,12 @@ final class EloquentProductRepository implements ProductRepository
                 $seen = [];
                 foreach ($variants as $variant) {
                     foreach ($variant->attributes ?? [] as $attr) {
-                        if (!isset($attr['type'], $attr['value']) || !is_string($attr['type']) || !is_string(
-                                $attr['value']
-                            )) {
+                        if (! isset($attr['type'], $attr['value']) || ! is_string($attr['type']) || ! is_string(
+                            $attr['value']
+                        )) {
                             continue;
                         }
-                        $seen[$attr['type'] . ':' . $attr['value']] = [
+                        $seen[$attr['type'].':'.$attr['value']] = [
                             'type' => $attr['type'],
                             'value' => $attr['value'],
                         ];
@@ -387,13 +418,13 @@ final class EloquentProductRepository implements ProductRepository
         }
 
         $allTypes = array_keys($counts);
-        $allValues = collect($counts)->flatMap(fn($values) => array_keys($values))->unique()->values();
+        $allValues = collect($counts)->flatMap(fn ($values) => array_keys($values))->unique()->values();
 
         $enrichment = ProductAttribute::whereIn('type', $allTypes)
             ->whereIn('value', $allValues)
             ->get()
             ->groupBy('type')
-            ->map(fn($group) => $group->keyBy('value'));
+            ->map(fn ($group) => $group->keyBy('value'));
 
         $attributeTypes = DB::table('attribute_types')
             ->whereIn('value', $allTypes)
@@ -413,7 +444,7 @@ final class EloquentProductRepository implements ProductRepository
                     'count' => $count,
                 ];
             }
-            usort($options, fn($a, $b) => $b['count'] - $a['count']);
+            usort($options, fn ($a, $b) => $b['count'] - $a['count']);
             $facets[] = [
                 'type' => $type,
                 'display_type' => $attributeTypes->get($type)?->display_type,

@@ -22,6 +22,7 @@ class ProductCollection extends Model
 
     public function products(): BelongsToMany
     {
-        return $this->belongsToMany(Product::class, 'collection_product', 'collection_id', 'product_id');
+        return $this->belongsToMany(Product::class, 'collection_product', 'collection_id', 'product_id')
+            ->using(CollectionProduct::class);
     }
 }

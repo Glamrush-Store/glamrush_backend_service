@@ -2,7 +2,6 @@
 
 namespace App\Presentation\Http\Resources\Catalog;
 
-use DateTimeImmutable;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
@@ -15,7 +14,8 @@ class ProductResource extends JsonResource
      */
     public function toArray(Request $request): array
     {
-        $now = new DateTimeImmutable();
+        $now = now()->toDateTimeImmutable();
+
         return [
             'id' => $this->id,
             'name' => $this->name,
@@ -23,9 +23,9 @@ class ProductResource extends JsonResource
             'sku' => $this->sku,
             'type' => $this->type,
             'isOnSale' => $this->isOnSale($now),
-
-            // 'price' => $this->effectivePrice($now),
-            'price' => $this->price,
+            'price' => $this->originalPrice(),
+            'salePrice' => $this->currentSalePrice($now),
+            'currentPrice' => $this->effectivePrice($now),
             'stock_quantity' => $this->stockQuantity,
             'available' => $this->isAvailable(),
 
@@ -59,7 +59,8 @@ class ProductResource extends JsonResource
                         'images' => $variant->images,
                         'isDefault' => $variant->isDefault(),
                         'price' => $variant->price,
-                        'salePrice' => $variant->salePrice,
+                        'salePrice' => $variant->currentSalePrice($now),
+                        'currentPrice' => $variant->effectivePrice($now),
                         'stock_quantity' => $variant->stockQuantity,
                         'inStock' => $variant->isAvailable(),
                         'isOnSale' => $variant->isOnSale($now),

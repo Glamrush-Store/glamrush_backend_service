@@ -27,7 +27,7 @@ class GetShippingOptionsController extends Controller
         GetShippingOptionsRequest $request,
     ): AnonymousResourceCollection {
         $address = new ShippingAddressEntity(
-            country: $request->string('country'),
+            country: $request->string('country')->toString(),
             state: $request->string('state')->toString(),
             city: $request->string('city')->toString(),
             postalCode: $request->filled('postal_code')
@@ -35,11 +35,12 @@ class GetShippingOptionsController extends Controller
                 : null,
         );
 
-        $options = $this->shippingQuoteService->getShippingOptions($address, 10, 000);
+        $options = $this->shippingQuoteService->getShippingOptions(
+            $address,
+            (float) ($request->validated('cart_subtotal') ?? 0),
+        );
 
         return ShippingOptionResource::collection($options);
     }
 
 }
-
-

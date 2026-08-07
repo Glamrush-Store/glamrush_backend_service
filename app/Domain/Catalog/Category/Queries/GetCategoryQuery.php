@@ -1,4 +1,5 @@
 <?php
+
 /*
  * © 2025 Demilade Oyewusi
  * Licensed under the MIT License.
@@ -7,31 +8,29 @@
 
 namespace App\Domain\Catalog\Category\Queries;
 
+use App\Infrastructure\Caching\CacheTags;
 use App\Shared\Contracts\Caching\CacheableQuery;
 
 final class GetCategoryQuery implements CacheableQuery
 {
     public function __construct(
         public string $slug
-    ) {
-    }
+    ) {}
 
     public function cacheKey(): string
     {
-        return 'categories' . md5(json_encode([
-                'slug' => $this->slug,
-            ]));
+        return 'categories'.md5(json_encode([
+            'slug' => $this->slug,
+        ]));
     }
 
     public function cacheTags(): array
     {
-        return ['categories'];
+        return [CacheTags::CATALOG, CacheTags::CATEGORIES];
     }
 
     public function ttl(): int
     {
         return 300;
     }
-
-
 }
