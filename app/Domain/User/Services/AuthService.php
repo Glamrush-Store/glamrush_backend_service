@@ -21,21 +21,19 @@ final class AuthService
     ) {}
 
     /**
-     * @return array{user: UserEntity, token: string}
+     * @return array{user: UserEntity, authenticatable: User}
      */
     public function register(array $data): array
     {
         $userEntity = $this->userRepository->create($data);
         $user = User::findOrFail($userEntity->id);
-        $token = $user->createToken('api')->plainTextToken;
-
         $this->recordRegistrationEvent((string) $user->id);
 
-        return ['user' => $userEntity, 'token' => $token];
+        return ['user' => $userEntity, 'authenticatable' => $user];
     }
 
     /**
-     * @return array{user: UserEntity, token: string}|null
+     * @return array{user: UserEntity, authenticatable: User}|null
      */
     public function login(string $email, string $password): ?array
     {
@@ -46,18 +44,12 @@ final class AuthService
         }
 
         $userEntity = $this->userRepository->findByEmail($email);
-        $token = $user->createToken('api')->plainTextToken;
 
-        return ['user' => $userEntity, 'token' => $token];
-    }
-
-    public function logout(User $user): void
-    {
-        $user->currentAccessToken()->delete();
+        return ['user' => $userEntity, 'authenticatable' => $user];
     }
 
     /**
-     * @return array{user: UserEntity, token: string}
+     * @return array{user: UserEntity, authenticatable: User}
      */
     public function handleSocialAuth(string $provider, string $accessToken): array
     {
@@ -67,9 +59,8 @@ final class AuthService
 
         if ($existingUser) {
             $userEntity = $this->userRepository->findById((string) $existingUser->id);
-            $token = $existingUser->createToken('api')->plainTextToken;
 
-            return ['user' => $userEntity, 'token' => $token];
+            return ['user' => $userEntity, 'authenticatable' => $existingUser];
         }
 
         $userByEmail = User::where('email', $socialUser->getEmail())->first();
@@ -87,9 +78,8 @@ final class AuthService
         }
 
         $this->socialAccountRepository->createForUser($userByEmail, $provider, $socialUser);
-        $token = $userByEmail->createToken('api')->plainTextToken;
 
-        return ['user' => $userEntity, 'token' => $token];
+        return ['user' => $userEntity, 'authenticatable' => $userByEmail];
     }
 
     private function recordRegistrationEvent(string $userId): void

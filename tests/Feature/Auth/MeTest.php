@@ -2,7 +2,6 @@
 
 use App\Infrastructure\Persistence\Eloquent\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
-use Laravel\Sanctum\Sanctum;
 
 uses(RefreshDatabase::class);
 
@@ -14,9 +13,10 @@ test('authenticated user can fetch their profile', function () {
         'password' => bcrypt('password123'),
     ]);
 
-    Sanctum::actingAs($user);
+    $this->actingAs($user, 'web');
 
-    $response = $this->getJson('/api/v1/auth/me');
+    $response = $this->withHeader('Origin', 'http://localhost:3000')
+        ->getJson('/api/v1/auth/me');
 
     $response->assertStatus(200)
         ->assertJsonStructure([

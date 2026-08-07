@@ -12,15 +12,18 @@ test('user can login with correct credentials', function () {
         'password' => bcrypt('password123'),
     ]);
 
-    $response = $this->postJson('/api/v1/auth/login', [
+    $response = $this->withHeader('Origin', 'http://localhost:3000')->postJson('/api/v1/auth/login', [
         'email' => 'test@example.com',
         'password' => 'password123',
     ]);
 
     $response->assertStatus(200)
         ->assertJsonStructure([
-            'data' => ['token', 'user' => ['id', 'name', 'email', 'phone', 'created_at']],
-        ]);
+            'data' => ['user' => ['id', 'name', 'email', 'phone', 'created_at']],
+        ])
+        ->assertJsonMissingPath('data.token');
+
+    $this->assertAuthenticatedAs(User::where('email', 'test@example.com')->first(), 'web');
 });
 
 test('login fails with wrong password', function () {
@@ -30,7 +33,7 @@ test('login fails with wrong password', function () {
         'password' => bcrypt('password123'),
     ]);
 
-    $response = $this->postJson('/api/v1/auth/login', [
+    $response = $this->withHeader('Origin', 'http://localhost:3000')->postJson('/api/v1/auth/login', [
         'email' => 'test@example.com',
         'password' => 'wrongpassword',
     ]);
@@ -40,7 +43,7 @@ test('login fails with wrong password', function () {
 });
 
 test('login fails with unknown email', function () {
-    $response = $this->postJson('/api/v1/auth/login', [
+    $response = $this->withHeader('Origin', 'http://localhost:3000')->postJson('/api/v1/auth/login', [
         'email' => 'nobody@example.com',
         'password' => 'password123',
     ]);

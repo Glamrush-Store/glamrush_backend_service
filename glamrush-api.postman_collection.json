@@ -65,9 +65,100 @@
             "value": "",
             "type": "string",
             "description": "Provider transaction ID used to verify a payment."
+        },
+        {
+            "key": "newsletterConfirmationToken",
+            "value": "",
+            "type": "string",
+            "description": "64-character newsletter confirmation token copied from the confirmation email URL."
+        },
+        {
+            "key": "newsletterUnsubscribeToken",
+            "value": "",
+            "type": "string",
+            "description": "Private unsubscribe token embedded in a marketing email."
         }
     ],
     "item": [
+        {
+            "name": "Newsletter",
+            "description": "Public double-opt-in newsletter subscription lifecycle. Subscriber listing and export intentionally belong to the admin application.",
+            "item": [
+                {
+                    "name": "Subscribe",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            { "key": "Content-Type", "value": "application/json" }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n    \"email\": \"customer@example.com\",\n    \"source\": \"storefront-footer\"\n}",
+                            "options": { "raw": { "language": "json" } }
+                        },
+                        "url": {
+                            "raw": "{{baseUrl}}/newsletter/subscriptions",
+                            "host": ["{{baseUrl}}"],
+                            "path": ["newsletter", "subscriptions"]
+                        }
+                    },
+                    "response": []
+                },
+                {
+                    "name": "Confirm Subscription",
+                    "request": {
+                        "method": "GET",
+                        "header": [],
+                        "url": {
+                            "raw": "{{baseUrl}}/newsletter/subscriptions/confirm/{{newsletterConfirmationToken}}",
+                            "host": ["{{baseUrl}}"],
+                            "path": ["newsletter", "subscriptions", "confirm", "{{newsletterConfirmationToken}}"]
+                        }
+                    },
+                    "response": []
+                },
+                {
+                    "name": "Resend Confirmation",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            { "key": "Content-Type", "value": "application/json" }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n    \"email\": \"customer@example.com\"\n}",
+                            "options": { "raw": { "language": "json" } }
+                        },
+                        "url": {
+                            "raw": "{{baseUrl}}/newsletter/subscriptions/resend-confirmation",
+                            "host": ["{{baseUrl}}"],
+                            "path": ["newsletter", "subscriptions", "resend-confirmation"]
+                        }
+                    },
+                    "response": []
+                },
+                {
+                    "name": "Unsubscribe",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            { "key": "Content-Type", "value": "application/json" }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n    \"token\": \"{{newsletterUnsubscribeToken}}\"\n}",
+                            "options": { "raw": { "language": "json" } }
+                        },
+                        "url": {
+                            "raw": "{{baseUrl}}/newsletter/subscriptions/unsubscribe",
+                            "host": ["{{baseUrl}}"],
+                            "path": ["newsletter", "subscriptions", "unsubscribe"]
+                        }
+                    },
+                    "response": []
+                }
+            ]
+        },
         {
             "name": "Auth",
             "description": "Registration, login, social auth, logout, current user, and password reset flow.\n\nProtected routes require `Authorization: Bearer {{authToken}}`.\nThe register and login requests auto-save the returned token to `{{authToken}}`.",
