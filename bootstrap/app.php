@@ -3,6 +3,7 @@
 use App\Presentation\Http\Middleware\PublicResponseCache;
 use App\Presentation\Http\Middleware\RequireCartIdentifier;
 use App\Presentation\Http\Middleware\RequireIdempotencyKey;
+use App\Presentation\Http\Middleware\RequireStatefulSpaRequest;
 use App\Presentation\Http\Middleware\ResolveStorefrontCategory;
 use Illuminate\Auth\AuthenticationException;
 use Illuminate\Foundation\Application;
@@ -18,6 +19,7 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware): void {
+        $middleware->statefulApi();
         $middleware->append(App\Presentation\Http\Middleware\ForceJsonResponse::class);
 
         $middleware->alias([
@@ -25,6 +27,7 @@ return Application::configure(basePath: dirname(__DIR__))
             'storefront.category' => ResolveStorefrontCategory::class,
             'public.cache' => PublicResponseCache::class,
             'idempotency.required' => RequireIdempotencyKey::class,
+            'stateful.spa' => RequireStatefulSpaRequest::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {

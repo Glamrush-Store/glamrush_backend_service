@@ -31,6 +31,10 @@ use App\Presentation\Http\Controllers\Customer\SetDefaultAddressController;
 use App\Presentation\Http\Controllers\Customer\ShowAddressController;
 use App\Presentation\Http\Controllers\Customer\StoreAddressController;
 use App\Presentation\Http\Controllers\Customer\UpdateAddressController;
+use App\Presentation\Http\Controllers\Newsletter\ConfirmNewsletterSubscriptionController;
+use App\Presentation\Http\Controllers\Newsletter\ResendNewsletterConfirmationController;
+use App\Presentation\Http\Controllers\Newsletter\SubscribeNewsletterController;
+use App\Presentation\Http\Controllers\Newsletter\UnsubscribeNewsletterController;
 use App\Presentation\Http\Controllers\Order\ListMyOrdersController;
 use App\Presentation\Http\Controllers\Payment\InitializePaymentController;
 use App\Presentation\Http\Controllers\Payment\ListPaymentMethodsController;
@@ -49,13 +53,25 @@ Route::get('/user', function (Request $request) {
 //  CATALOG API ROUTES
 // ========================================================
 
-Route::prefix('v1')->group(function () {
+Route::prefix('v1')->middleware('throttle:api')->group(function () {
+    Route::prefix('newsletter/subscriptions')->group(function () {
+        Route::post('/', SubscribeNewsletterController::class)->middleware('throttle:newsletter-subscribe');
+        Route::get('/confirm/{token}', ConfirmNewsletterSubscriptionController::class)
+            ->middleware('throttle:newsletter-action')
+            ->where('token', '[A-Za-z0-9]{64}')
+            ->name('newsletter.subscriptions.confirm');
+        Route::post('/resend-confirmation', ResendNewsletterConfirmationController::class)
+            ->middleware('throttle:newsletter-subscribe');
+        Route::post('/unsubscribe', UnsubscribeNewsletterController::class)
+            ->middleware('throttle:newsletter-action');
+    });
+
     // Single-root-category storefront. These routes preserve the existing
     // full catalog API while enforcing the selected root category tree.
     Route::prefix('storefronts/{storefront}')
         ->middleware('storefront.category')
         ->group(function () {
-            Route::middleware('public.cache')->group(function () {
+            Route::middleware(['public.cache', 'throttle:catalog'])->group(function () {
                 Route::get('/homepage', GetHomepageController::class);
                 Route::get('/categories', ListCategoryController::class);
                 Route::get('/products', ListProductController::class);
@@ -64,33 +80,41 @@ Route::prefix('v1')->group(function () {
             });
 
             Route::prefix('cart')->group(function () {
-                Route::post('/', AddToCartController::class);
-                Route::post('/merge', MergeCartController::class)->middleware('auth:sanctum');
+                Route::post('/', AddToCartController::class)->middleware('throttle:cart-mutation');
+                Route::post('/merge', MergeCartController::class)
+                    ->middleware(['auth:sanctum', 'throttle:cart-mutation']);
 
                 Route::middleware('cart.identifier')->group(function () {
                     Route::get('/', GetCartController::class);
-                    Route::patch('/items/{itemId}', UpdateCartItemByIdController::class);
-                    Route::delete('/items/{itemId}', RemoveCartItemByIdController::class);
-                    Route::patch('/{productId}', UpdateCartItemController::class);
-                    Route::delete('/{productId}', RemoveCartItemController::class);
-                    Route::delete('/', ClearCartController::class);
+                    Route::patch('/items/{itemId}', UpdateCartItemByIdController::class)
+                        ->middleware('throttle:cart-mutation');
+                    Route::delete('/items/{itemId}', RemoveCartItemByIdController::class)
+                        ->middleware('throttle:cart-mutation');
+                    Route::patch('/{productId}', UpdateCartItemController::class)
+                        ->middleware('throttle:cart-mutation');
+                    Route::delete('/{productId}', RemoveCartItemController::class)
+                        ->middleware('throttle:cart-mutation');
+                    Route::delete('/', ClearCartController::class)->middleware('throttle:cart-mutation');
                 });
             });
 
             Route::post('/checkout/cart', CheckoutCartController::class)
-                ->middleware(['cart.identifier', 'idempotency.required']);
+                ->middleware(['cart.identifier', 'idempotency.required', 'throttle:checkout-payment']);
         });
 
     // ======================================================
     //  AUTH ROUTES
     // ======================================================
     Route::prefix('auth')->group(function () {
-        Route::post('/register', RegisterController::class);
-        Route::post('/login', LoginController::class);
-        Route::post('/social/{provider}', SocialCallbackController::class);
-        Route::post('/password/forgot', ForgotPasswordController::class);
-        Route::post('/password/verify', VerifyPasswordCodeController::class);
-        Route::post('/password/reset', ResetPasswordController::class);
+        Route::post('/register', RegisterController::class)
+            ->middleware(['stateful.spa', 'throttle:onboarding']);
+        Route::post('/login', LoginController::class)
+            ->middleware(['stateful.spa', 'throttle:login']);
+        Route::post('/social/{provider}', SocialCallbackController::class)
+            ->middleware(['stateful.spa', 'throttle:onboarding']);
+        Route::post('/password/forgot', ForgotPasswordController::class)->middleware('throttle:password-forgot');
+        Route::post('/password/verify', VerifyPasswordCodeController::class)->middleware('throttle:password-verify');
+        Route::post('/password/reset', ResetPasswordController::class)->middleware('throttle:password-reset');
 
         Route::middleware('auth:sanctum')->group(function () {
             Route::post('/logout', LogoutController::class);
@@ -99,7 +123,7 @@ Route::prefix('v1')->group(function () {
     });
 
     // Products
-    Route::middleware('public.cache')->group(function () {
+    Route::middleware(['public.cache', 'throttle:catalog'])->group(function () {
         Route::get('/products', ListProductController::class);
         Route::get('/products/{slug}', GetProductController::class);
 
@@ -117,16 +141,21 @@ Route::prefix('v1')->group(function () {
 
     // Cart
     Route::prefix('cart')->group(function () {
-        Route::post('/', AddToCartController::class);
-        Route::post('/merge', MergeCartController::class)->middleware('auth:sanctum');
+        Route::post('/', AddToCartController::class)->middleware('throttle:cart-mutation');
+        Route::post('/merge', MergeCartController::class)
+            ->middleware(['auth:sanctum', 'throttle:cart-mutation']);
 
         Route::middleware('cart.identifier')->group(function () {
             Route::get('/', GetCartController::class);
-            Route::patch('/items/{itemId}', UpdateCartItemByIdController::class);
-            Route::delete('/items/{itemId}', RemoveCartItemByIdController::class);
-            Route::patch('/{productId}', UpdateCartItemController::class);
-            Route::delete('/{productId}', RemoveCartItemController::class);
-            Route::delete('/', ClearCartController::class);
+            Route::patch('/items/{itemId}', UpdateCartItemByIdController::class)
+                ->middleware('throttle:cart-mutation');
+            Route::delete('/items/{itemId}', RemoveCartItemByIdController::class)
+                ->middleware('throttle:cart-mutation');
+            Route::patch('/{productId}', UpdateCartItemController::class)
+                ->middleware('throttle:cart-mutation');
+            Route::delete('/{productId}', RemoveCartItemController::class)
+                ->middleware('throttle:cart-mutation');
+            Route::delete('/', ClearCartController::class)->middleware('throttle:cart-mutation');
         });
     });
 
@@ -158,13 +187,14 @@ Route::prefix('v1')->group(function () {
 
     // Checkout
     Route::post('/checkout/cart', CheckoutCartController::class)
-        ->middleware(['cart.identifier', 'idempotency.required']);
+        ->middleware(['cart.identifier', 'idempotency.required', 'throttle:checkout-payment']);
 
     Route::get('/payment-methods', ListPaymentMethodsController::class)->middleware('public.cache');
     Route::post('/payments/initialize', InitializePaymentController::class)
-        ->middleware('idempotency.required');
-    Route::post('/payments/verify', VerifyPaymentController::class);
+        ->middleware(['idempotency.required', 'throttle:checkout-payment']);
+    Route::post('/payments/verify', VerifyPaymentController::class)->middleware('throttle:payment-verify');
     Route::post('/payments/webhooks/{provider}', PaymentWebhookController::class)
+        ->middleware('throttle:payment-webhook')
         ->whereIn('provider', ['paystack', 'flutterwave']);
 });
 

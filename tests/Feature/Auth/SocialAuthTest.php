@@ -28,28 +28,30 @@ function mockSocialiteDriver(object $socialUser): void
     Socialite::shouldReceive('driver')->with('google')->andReturn($provider);
 }
 
-test('new social user is created and receives token', function () {
+test('new social user is created and receives a stateful session', function () {
     $socialUser = makeSocialUser('google-uid-123', 'Google User', 'social@example.com');
     mockSocialiteDriver($socialUser);
 
-    $response = $this->postJson('/api/v1/auth/social/google', [
+    $response = $this->withHeader('Origin', 'http://localhost:3000')->postJson('/api/v1/auth/social/google', [
         'token' => 'valid-google-token',
     ]);
 
     $response->assertStatus(201)
         ->assertJsonStructure([
-            'data' => ['token', 'user' => ['id', 'name', 'email', 'phone', 'created_at']],
-        ]);
+            'data' => ['user' => ['id', 'name', 'email', 'phone', 'created_at']],
+        ])
+        ->assertJsonMissingPath('data.token');
 
     expect(User::where('email', 'social@example.com')->exists())->toBeTrue();
 });
 
-test('existing social user receives token without creating new user', function () {
+test('existing social user receives a session without creating new user', function () {
     $socialUser = makeSocialUser('google-uid-123', 'Google User', 'social@example.com');
     mockSocialiteDriver($socialUser);
 
     // First call creates the user
-    $this->postJson('/api/v1/auth/social/google', ['token' => 'valid-google-token'])
+    $this->withHeader('Origin', 'http://localhost:3000')
+        ->postJson('/api/v1/auth/social/google', ['token' => 'valid-google-token'])
         ->assertStatus(201);
 
     // Reset Socialite mock for second call
@@ -58,7 +60,8 @@ test('existing social user receives token without creating new user', function (
     mockSocialiteDriver($socialUser2);
 
     // Second call finds existing user
-    $response = $this->postJson('/api/v1/auth/social/google', ['token' => 'valid-google-token']);
+    $response = $this->withHeader('Origin', 'http://localhost:3000')
+        ->postJson('/api/v1/auth/social/google', ['token' => 'valid-google-token']);
 
     $response->assertStatus(201);
 
@@ -75,7 +78,7 @@ test('existing user by email gets social account linked', function () {
     $socialUser = makeSocialUser('google-uid-456', 'Existing User', 'social@example.com');
     mockSocialiteDriver($socialUser);
 
-    $response = $this->postJson('/api/v1/auth/social/google', [
+    $response = $this->withHeader('Origin', 'http://localhost:3000')->postJson('/api/v1/auth/social/google', [
         'token' => 'valid-google-token',
     ]);
 
@@ -91,7 +94,7 @@ test('invalid social token returns 422', function () {
 
     Socialite::shouldReceive('driver')->with('google')->andReturn($provider);
 
-    $response = $this->postJson('/api/v1/auth/social/google', [
+    $response = $this->withHeader('Origin', 'http://localhost:3000')->postJson('/api/v1/auth/social/google', [
         'token' => 'invalid-token',
     ]);
 
