@@ -15,6 +15,7 @@ interface CheckoutRepository
         ?array $billingAddressPayload,
         string $shippingRateId,
         string $paymentMethod,
+        ?string $discountCode,
         ?int $userId,
         string $idempotencyOwner,
         string $idempotencyKey,

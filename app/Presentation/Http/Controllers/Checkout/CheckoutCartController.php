@@ -39,6 +39,7 @@ final class CheckoutCartController
                 billingAddressPayload: $request->billingAddressPayload(),
                 shippingRateId: $request->validated('shipping_rate_id'),
                 paymentMethod: $request->validated('payment_method'),
+                discountCode: $request->validated('discount_code'),
                 userId: $request->user('sanctum')?->id,
                 idempotencyKey: (string) $request->attributes->get('idempotency_key'),
                 requestHash: IdempotencyFingerprint::from([

@@ -16,6 +16,7 @@ use App\Infrastructure\Persistence\Eloquent\Models\Order;
 use App\Infrastructure\Persistence\Eloquent\Models\ProductVariant;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 
 class EloquentOrderRepository implements OrderRepository
 {
@@ -48,6 +49,8 @@ class EloquentOrderRepository implements OrderRepository
                     'sku' => $item->sku,
                     'unit_price' => $item->unitPrice,
                     'quantity' => $item->quantity,
+                    'line_subtotal' => $item->unitPrice * $item->quantity,
+                    'discount_amount' => 0,
                     'line_total' => $item->unitPrice * $item->quantity,
                     'product_snapshot' => $item->productSnapshot,
                 ]);
@@ -147,6 +150,13 @@ class EloquentOrderRepository implements OrderRepository
             'inventory_committed_at' => now(),
         ]);
 
+        if (Schema::hasTable('discount_redemptions')) {
+            DB::table('discount_redemptions')
+                ->where('order_id', $order->id)
+                ->where('status', 'reserved')
+                ->update(['status' => 'redeemed', 'redeemed_at' => now(), 'updated_at' => now()]);
+        }
+
         return true;
     }
 
@@ -159,18 +169,26 @@ class EloquentOrderRepository implements OrderRepository
 
     public function markAsPendingOnDelivery(string $orderId): bool
     {
-        return Order::query()
+        $updated = Order::query()
             ->whereKey($orderId)
             ->where('status', 'pending_payment')
             ->update(['status' => 'pending_on_delivery']) === 1;
+
+        if ($updated && Schema::hasTable('discount_redemptions')) {
+            DB::table('discount_redemptions')
+                ->where('order_id', $orderId)
+                ->where('status', 'reserved')
+                ->update(['status' => 'redeemed', 'redeemed_at' => now(), 'updated_at' => now()]);
+        }
+
+        return $updated;
     }
 
     public function cancelPendingOrder(string $orderId): void
     {
-        $order = Order::where('id', $orderId)->firstOrFail();
-
-        DB::transaction(function () use ($order) {
-            if ($order->status !== 'pending_payment') {
+        DB::transaction(function () use ($orderId) {
+            $order = Order::query()->whereKey($orderId)->lockForUpdate()->firstOrFail();
+            if ($order->status->value !== 'pending_payment') {
                 return;
             }
 
@@ -189,6 +207,13 @@ class EloquentOrderRepository implements OrderRepository
                 'status' => 'cancelled',
                 'cancelled_at' => now(),
             ]);
+
+            if (Schema::hasTable('discount_redemptions')) {
+                DB::table('discount_redemptions')
+                    ->where('order_id', $order->id)
+                    ->where('status', 'reserved')
+                    ->update(['status' => 'released', 'released_at' => now(), 'updated_at' => now()]);
+            }
         });
     }
 

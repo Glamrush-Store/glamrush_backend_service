@@ -2470,6 +2470,33 @@
             "description": "Checkout requires Idempotency-Key. Reuse the same key only when retrying an identical request; a different payload with the same key returns 422.",
             "item": [
                 {
+                    "name": "Validate Discount Code",
+                    "request": {
+                        "method": "POST",
+                        "auth": {
+                            "type": "bearer",
+                            "bearer": [{ "key": "token", "value": "{{authToken}}", "type": "string" }]
+                        },
+                        "header": [
+                            { "key": "Content-Type", "value": "application/json" },
+                            { "key": "Accept", "value": "application/json" },
+                            { "key": "X-Cart-Token", "value": "{{cartToken}}" }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n    \"code\": \"WELCOME10\",\n    \"email\": \"jane@example.com\",\n    \"shipping_amount\": 2500\n}",
+                            "options": { "raw": { "language": "json" } }
+                        },
+                        "url": {
+                            "raw": "{{baseUrl}}/storefronts/{{storefrontSlug}}/discounts/validate",
+                            "host": ["{{baseUrl}}"],
+                            "path": ["storefronts", "{{storefrontSlug}}", "discounts", "validate"]
+                        },
+                        "description": "Previews a discount against the current authenticated or guest cart. Checkout always recalculates the discount authoritatively."
+                    },
+                    "response": []
+                },
+                {
                     "name": "Checkout Cart",
                     "event": [
                         {
@@ -2497,7 +2524,7 @@
                         ],
                         "body": {
                             "mode": "raw",
-                            "raw": "{\n    \"shipping_rate_id\": \"01ARYZ6S41TPTWDRA8XHBJK1T\",\n    \"payment_method\": \"paystack\",\n    \"shipping_address\": {\n        \"full_name\": \"Jane Smith\",\n        \"email\": \"jane@example.com\",\n        \"phone\": \"+2348000000000\",\n        \"country\": \"Nigeria\",\n        \"state\": \"Lagos\",\n        \"city\": \"Lagos\",\n        \"postal_code\": \"100001\",\n        \"line1\": \"1 Example Street\",\n        \"line2\": null\n    },\n    \"billing_address\": {\n        \"same_as_shipping\": true\n    }\n}",
+                            "raw": "{\n    \"shipping_rate_id\": \"01ARYZ6S41TPTWDRA8XHBJK1T\",\n    \"payment_method\": \"paystack\",\n    \"discount_code\": \"WELCOME10\",\n    \"shipping_address\": {\n        \"full_name\": \"Jane Smith\",\n        \"email\": \"jane@example.com\",\n        \"phone\": \"+2348000000000\",\n        \"country\": \"Nigeria\",\n        \"state\": \"Lagos\",\n        \"city\": \"Lagos\",\n        \"postal_code\": \"100001\",\n        \"line1\": \"1 Example Street\",\n        \"line2\": null\n    },\n    \"billing_address\": {\n        \"same_as_shipping\": true\n    }\n}",
                             "options": { "raw": { "language": "json" } }
                         },
                         "url": {
