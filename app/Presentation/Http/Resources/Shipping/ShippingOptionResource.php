@@ -20,8 +20,10 @@ class ShippingOptionResource extends JsonResource
     {
         return [
             'rate_id' => $this->rateId,
-            'method' => $this->method,
-            'zone' => $this->zone,
+            'method' => $this->method->name,
+            'method_code' => $this->method->code,
+            'description' => $this->method->description,
+            'zone' => $this->zone->name,
             'amount' => $this->amount,
             'currency' => $this->currency,
             'estimated_days_min' => $this->estimatedDaysMin,

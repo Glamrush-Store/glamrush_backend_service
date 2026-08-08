@@ -1,6 +1,7 @@
 *.log
 .DS_Store
 .env
+.env.octane
 .env.backup
 .env.production
 .phpactor.json
@@ -25,3 +26,4 @@ Thumbs.db
 .claude
 CLAUDE.md
 .claude/settings.local.json
+.env.docker

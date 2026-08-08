@@ -2,17 +2,21 @@
 
 namespace App\Presentation\Http\Controllers\Auth;
 
-use App\Domain\User\Services\AuthService;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
+use Illuminate\Support\Facades\Auth;
 
 final class LogoutController
 {
-    public function __construct(private readonly AuthService $authService) {}
-
     public function __invoke(Request $request): Response
     {
-        $this->authService->logout($request->user());
+        $request->user()?->currentAccessToken()?->delete();
+
+        if ($request->hasSession()) {
+            Auth::guard('web')->logout();
+            $request->session()->invalidate();
+            $request->session()->regenerateToken();
+        }
 
         return response()->noContent();
     }

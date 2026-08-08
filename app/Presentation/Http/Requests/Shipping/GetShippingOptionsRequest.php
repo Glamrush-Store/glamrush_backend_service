@@ -19,6 +19,7 @@ class GetShippingOptionsRequest extends FormRequest
             'state' => ['nullable', 'string', 'max:255'],
             'city' => ['nullable', 'string', 'max:255'],
             'postal_code' => ['nullable', 'string', 'max:15'],
+            'cart_subtotal' => ['nullable', 'numeric', 'min:0'],
         ];
     }
 }

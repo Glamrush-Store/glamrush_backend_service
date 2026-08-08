@@ -4,6 +4,7 @@ namespace App\Infrastructure\Persistence\Eloquent\Models;
 
 use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Spatie\Image\Enums\Fit;
 use Spatie\MediaLibrary\HasMedia;
 use Spatie\MediaLibrary\InteractsWithMedia;
@@ -15,9 +16,9 @@ class Category extends Model implements HasMedia
 
     protected $keyType = 'string';
 
-
     protected $casts = [
-        'is_active' => 'boolean'
+        'is_active' => 'boolean',
+        'deleted_at' => 'datetime',
     ];
 
     public function parent()
@@ -32,7 +33,7 @@ class Category extends Model implements HasMedia
             ->singleFile();
     }
 
-    public function registerMediaConversions(Media $media = null): void
+    public function registerMediaConversions(?Media $media = null): void
     {
         $this->addMediaConversion('thumb')
             ->width(300)
@@ -44,7 +45,6 @@ class Category extends Model implements HasMedia
             ->nonQueued();
     }
 
-
     public function childrenRecursive()
     {
         return $this->children()->with('childrenRecursive');
@@ -53,5 +53,10 @@ class Category extends Model implements HasMedia
     public function children()
     {
         return $this->hasMany(Category::class, 'parent_id');
+    }
+
+    public function products(): HasMany
+    {
+        return $this->hasMany(Product::class);
     }
 }

@@ -3,6 +3,7 @@
 namespace App\Presentation\Http\Controllers\Catalog;
 
 use App\Domain\Catalog\Cart\CartIdentifier;
+use App\Domain\Catalog\Cart\Exceptions\AmbiguousCartItemException;
 use App\Domain\Catalog\Cart\Services\CartService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -13,11 +14,15 @@ final class RemoveCartItemController
         private readonly CartService $service,
     ) {}
 
-    public function __invoke(Request $request, string $productId): JsonResponse
+    public function __invoke(Request $request): JsonResponse
     {
         $id = $this->resolveIdentifier($request);
 
-        $this->service->remove($id, $productId);
+        try {
+            $this->service->remove($id, (string) $request->route('productId'));
+        } catch (AmbiguousCartItemException $exception) {
+            return response()->json(['success' => false, 'message' => $exception->getMessage()], 409);
+        }
 
         return response()->json(null, 204);
     }

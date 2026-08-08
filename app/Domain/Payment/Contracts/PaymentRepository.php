@@ -8,11 +8,22 @@ use App\Domain\Payment\Entities\PaymentMethodEntity;
 
 interface PaymentRepository
 {
-    public function createPending(OrderEntity $order, PaymentMethodEntity $method, string $reference): PaymentEntity;
+    public function createPending(
+        OrderEntity $order,
+        PaymentMethodEntity $method,
+        string $reference,
+        string $idempotencyOwner,
+        string $idempotencyKey,
+        string $requestHash,
+    ): PaymentEntity;
 
     public function updateInitialized(string $paymentId, ?string $authorizationUrl, string $status, array $metadata = []): PaymentEntity;
 
     public function findByReference(string $reference): ?PaymentEntity;
+
+    public function findByReferenceForUpdate(string $reference): ?PaymentEntity;
+
+    public function findByIdempotency(string $owner, string $key): ?PaymentEntity;
 
     public function markAsPaid(string $paymentId, ?string $providerReference, ?string $transactionId, array $payload = []): PaymentEntity;
 
@@ -26,7 +37,8 @@ interface PaymentRepository
         ?float $amount,
         ?string $currency,
         array $payload = [],
-    ): void;
+        ?string $eventKey = null,
+    ): bool;
 
     public function referenceExists(string $reference): bool;
 }

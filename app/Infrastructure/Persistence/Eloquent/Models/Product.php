@@ -1,4 +1,5 @@
 <?php
+
 /*
  * © 2025 Demilade Oyewusi
  * Licensed under the MIT License.
@@ -12,6 +13,7 @@ use Abbasudo\Purity\Traits\Sortable;
 use App\Infrastructure\Persistence\Eloquent\Scopes\PublishedScope;
 use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Spatie\Image\Enums\Fit;
 use Spatie\MediaLibrary\HasMedia;
 use Spatie\MediaLibrary\InteractsWithMedia;
@@ -19,9 +21,10 @@ use Spatie\MediaLibrary\MediaCollections\Models\Media;
 
 class Product extends Model implements HasMedia
 {
-    use HasUlids, Filterable, Sortable, interactsWithMedia;
+    use Filterable, HasUlids, interactsWithMedia, Sortable;
 
     public $incrementing = false;
+
     protected $fillable = [
         'id',
         'name',
@@ -41,6 +44,7 @@ class Product extends Model implements HasMedia
         'stock_quantity',
         'in_stock',
     ];
+
     protected $keyType = 'string';
 
     protected $table = 'products';
@@ -48,6 +52,7 @@ class Product extends Model implements HasMedia
     protected $casts = [
         'published_at' => 'datetime',
     ];
+
     protected array $filterable = [
         'search',   // custom filter
         // add others later if needed
@@ -65,7 +70,7 @@ class Product extends Model implements HasMedia
             ->singleFile();
     }
 
-    public function registerMediaConversions(Media $media = null): void
+    public function registerMediaConversions(?Media $media = null): void
     {
         $this->addMediaConversion('thumb')
             ->width(300)
@@ -87,7 +92,6 @@ class Product extends Model implements HasMedia
         return $this->belongsTo(Category::class);
     }
 
-
     public function vendor()
     {
         return $this->belongsTo(Vendor::class);
@@ -98,10 +102,15 @@ class Product extends Model implements HasMedia
         return $this->belongsTo(Brand::class);
     }
 
+    public function collections(): BelongsToMany
+    {
+        return $this->belongsToMany(ProductCollection::class, 'collection_product', 'product_id', 'collection_id')
+            ->using(CollectionProduct::class);
+    }
+
     public function defaultVariant()
     {
         return $this->hasOne(ProductVariant::class)
             ->where('is_default', true);
     }
-
 }

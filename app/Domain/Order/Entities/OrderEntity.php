@@ -12,8 +12,11 @@ final class OrderEntity
         public readonly ?string $guestId,
         public readonly string $orderNumber,
         public readonly string $status,
+        public readonly ?string $discountCode,
         public readonly float $subtotal,
+        public readonly float $discountAmount,
         public readonly float $shippingAmount,
+        public readonly float $shippingDiscountAmount,
         public readonly string $total,
         public readonly string $currency,
         public readonly ?string $shippingRateId,
@@ -31,7 +34,7 @@ final class OrderEntity
 
     public function total(): float
     {
-        return $this->subtotal + $this->shippingAmount;
+        return (float) $this->total;
     }
 
     public function isPendingPayment(): bool

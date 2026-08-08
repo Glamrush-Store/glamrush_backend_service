@@ -23,6 +23,7 @@ final class CheckOutCartRequest extends FormRequest
         return [
             'shipping_rate_id' => ['required', 'string', 'exists:shipping_rates,id'],
             'payment_method' => ['required', 'string', Rule::in(['paystack', 'flutterwave', 'pay_on_delivery'])],
+            'discount_code' => ['nullable', 'string', 'max:64', 'regex:/^[A-Za-z0-9_-]+$/'],
 
             'shipping_address' => ['required', 'array'],
             'shipping_address.full_name' => ['required', 'string', 'max:150'],

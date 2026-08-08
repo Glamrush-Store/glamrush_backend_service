@@ -13,11 +13,18 @@
         "abbasudo/laravel-purity": "^3.3",
         "darkaonline/l5-swagger": "^9.0",
         "laravel/framework": "^12.0",
+        "laravel/octane": "^2.17",
         "laravel/sanctum": "^4.0",
         "laravel/socialite": "^5.24",
         "laravel/tinker": "^2.10.1",
         "league/flysystem-google-cloud-storage": "^3.31",
+        "php-amqplib/php-amqplib": "^3.7",
+        "resend/resend-php": "^1.3",
+        "sentry/sentry-laravel": "^4.27",
         "spatie/laravel-medialibrary": "^11.17"
+    },
+    "suggest": {
+        "ext-rdkafka": "Required when EVENT_BUS_DRIVER=kafka"
     },
     "require-dev": {
         "fakerphp/faker": "^1.23",

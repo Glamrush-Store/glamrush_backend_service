@@ -4,28 +4,47 @@ namespace App\Infrastructure\Persistence\Eloquent\Mappers\Catalog;
 
 use App\Domain\Catalog\Cart\Entities\CartItemEntity;
 use App\Infrastructure\Persistence\Eloquent\Models\CartItem;
+use App\Infrastructure\Persistence\Eloquent\Models\Product;
+use App\Infrastructure\Persistence\Eloquent\Models\ProductVariant;
 
 final class CartItemMapper
 {
     public static function toDomain(CartItem $model): CartItemEntity
     {
         $product = $model->product;
-        $thumb = $product->getFirstMediaUrl('catalog-photos', 'thumb');
-        $unitPrice = self::resolvePrice($product);
+        $variant = $model->variant;
+        $thumb = $variant?->getFirstMediaUrl('catalog-photos', 'thumb') ?: null;
+        $thumb ??= $product->getFirstMediaUrl('catalog-photos', 'thumb') ?: null;
 
         return new CartItemEntity(
             id: $model->id,
             productId: (string) $model->product_id,
+            productVariantId: $variant ? (string) $variant->id : null,
+            sku: $variant?->sku,
+            attributes: $variant?->attributes ?? [],
             name: $product->name,
             slug: $product->slug,
-            thumb: $thumb !== '' ? $thumb : null,
+            thumb: $thumb,
             quantity: $model->quantity,
-            unitPrice: $unitPrice,
+            unitPrice: $variant ? self::resolveVariantPrice($variant) : self::resolveProductPrice($product),
             expiresAt: $model->expires_at,
         );
     }
 
-    private static function resolvePrice(\App\Infrastructure\Persistence\Eloquent\Models\Product $product): float
+    private static function resolveVariantPrice(ProductVariant $variant): float
+    {
+        $now = now();
+        $saleStarted = $variant->sale_starts_at === null || $now->greaterThanOrEqualTo($variant->sale_starts_at);
+        $saleNotEnded = $variant->sale_ends_at === null || $now->lessThanOrEqualTo($variant->sale_ends_at);
+
+        if ($variant->sale_price !== null && $saleStarted && $saleNotEnded) {
+            return (float) $variant->sale_price;
+        }
+
+        return (float) $variant->price;
+    }
+
+    private static function resolveProductPrice(Product $product): float
     {
         $now = now();
 

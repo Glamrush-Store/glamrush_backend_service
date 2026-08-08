@@ -11,6 +11,6 @@ final class PaymentInitializationEntity
         public readonly string $reference,
         public readonly string $provider,
         public readonly string $status,
-    ) {
-    }
+        public readonly bool $replayed = false,
+    ) {}
 }

@@ -6,7 +6,7 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 uses(RefreshDatabase::class);
 
 test('user can register with valid data', function () {
-    $response = $this->postJson('/api/v1/auth/register', [
+    $response = $this->withHeader('Origin', 'http://localhost:3000')->postJson('/api/v1/auth/register', [
         'name' => 'Test User',
         'email' => 'test@example.com',
         'password' => 'password123',
@@ -15,15 +15,16 @@ test('user can register with valid data', function () {
 
     $response->assertStatus(201)
         ->assertJsonStructure([
-            'data' => ['token', 'user' => ['id', 'name', 'email', 'phone', 'created_at']],
+            'data' => ['user' => ['id', 'name', 'email', 'phone', 'created_at']],
         ])
+        ->assertJsonMissingPath('data.token')
         ->assertJsonPath('data.user.email', 'test@example.com');
 
     expect(User::where('email', 'test@example.com')->exists())->toBeTrue();
 });
 
 test('user can register with optional phone', function () {
-    $response = $this->postJson('/api/v1/auth/register', [
+    $response = $this->withHeader('Origin', 'http://localhost:3000')->postJson('/api/v1/auth/register', [
         'name' => 'Test User',
         'email' => 'test@example.com',
         'phone' => '+1234567890',
@@ -42,7 +43,7 @@ test('registration fails with duplicate email', function () {
         'password' => bcrypt('password123'),
     ]);
 
-    $response = $this->postJson('/api/v1/auth/register', [
+    $response = $this->withHeader('Origin', 'http://localhost:3000')->postJson('/api/v1/auth/register', [
         'name' => 'New User',
         'email' => 'test@example.com',
         'password' => 'password123',
@@ -54,7 +55,7 @@ test('registration fails with duplicate email', function () {
 });
 
 test('registration fails with invalid input', function () {
-    $response = $this->postJson('/api/v1/auth/register', [
+    $response = $this->withHeader('Origin', 'http://localhost:3000')->postJson('/api/v1/auth/register', [
         'name' => '',
         'email' => 'not-an-email',
         'password' => 'short',

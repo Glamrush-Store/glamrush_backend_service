@@ -25,6 +25,9 @@ final class PaymentMapper
             paidAt: $model->paid_at !== null ? DateTimeImmutable::createFromInterface($model->paid_at) : null,
             failedAt: $model->failed_at !== null ? DateTimeImmutable::createFromInterface($model->failed_at) : null,
             metadata: $model->metadata ?? [],
+            idempotencyOwner: $model->idempotency_owner,
+            idempotencyKey: $model->idempotency_key,
+            idempotencyRequestHash: $model->idempotency_request_hash,
         );
     }
 }

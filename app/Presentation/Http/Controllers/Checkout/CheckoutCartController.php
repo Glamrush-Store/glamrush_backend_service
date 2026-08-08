@@ -8,14 +8,15 @@ use App\Domain\Shipping\Entities\ShippingAddressEntity;
 use App\Presentation\Http\Requests\Cart\CheckOutCartRequest;
 use App\Presentation\Http\Resources\Order\OrderResource;
 use App\Presentation\Http\Responses\ApiResponse;
+use App\Shared\Idempotency\IdempotencyFingerprint;
 use Illuminate\Http\JsonResponse;
+use RuntimeException;
 
 final class CheckoutCartController
 {
     public function __construct(
         private readonly CheckoutService $checkoutService,
-    ) {
-    }
+    ) {}
 
     public function __invoke(CheckOutCartRequest $request): JsonResponse
     {
@@ -30,17 +31,28 @@ final class CheckoutCartController
                 : null,
         );
 
-        $order = $this->checkoutService->checkoutCart(
-            cartIdentifier: $cartIdentifier,
-            shippingAddress: $shippingAddress,
-            shippingAddressPayload: $request->shippingAddressPayload(),
-            billingAddressPayload: $request->billingAddressPayload(),
-            shippingRateId: $request->validated('shipping_rate_id'),
-            paymentMethod: $request->validated('payment_method'),
-            userId: $request->user('sanctum')?->id,
-        );
+        try {
+            $result = $this->checkoutService->checkoutCart(
+                cartIdentifier: $cartIdentifier,
+                shippingAddress: $shippingAddress,
+                shippingAddressPayload: $request->shippingAddressPayload(),
+                billingAddressPayload: $request->billingAddressPayload(),
+                shippingRateId: $request->validated('shipping_rate_id'),
+                paymentMethod: $request->validated('payment_method'),
+                discountCode: $request->validated('discount_code'),
+                userId: $request->user('sanctum')?->id,
+                idempotencyKey: (string) $request->attributes->get('idempotency_key'),
+                requestHash: IdempotencyFingerprint::from([
+                    'storefront' => $request->route('storefront'),
+                    'payload' => $request->validated(),
+                ]),
+            );
+        } catch (RuntimeException $exception) {
+            return ApiResponse::error($exception->getMessage(), status: 422);
+        }
 
-        return ApiResponse::success(new OrderResource($order), 'Order created successfully.', 201);
+        return ApiResponse::success(new OrderResource($result->order), 'Order created successfully.', 201)
+            ->header('Idempotent-Replayed', $result->replayed ? 'true' : 'false');
     }
 
     private function resolveCartIdentifier(CheckOutCartRequest $request): CartIdentifier

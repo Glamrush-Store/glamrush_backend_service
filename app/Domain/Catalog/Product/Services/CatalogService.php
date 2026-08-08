@@ -1,4 +1,5 @@
 <?php
+
 /*
  * © 2026 Demilade Oyewusi
  * Licensed under the MIT License.
@@ -13,23 +14,22 @@ use App\Domain\Catalog\Product\Queries\GetProductQuery;
 use App\Domain\Catalog\Product\Queries\ListFacetsQuery;
 use App\Domain\Catalog\Product\Queries\ListProductsQuery;
 use App\Infrastructure\Caching\QueryCache;
+use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Pagination\LengthAwarePaginator;
-use RuntimeException;
 
 final class CatalogService
 {
     public function __construct(
         private ProductRepository $products
-    ) {
-    }
+    ) {}
 
     public function getProduct(GetProductQuery $query): ?ProductEntity
     {
         return QueryCache::remember($query, function () use ($query) {
-            $product = $this->products->findBySlug($query->slug);
+            $product = $this->products->findBySlug($query);
 
-            if (!$product) {
-                throw new RuntimeException('Product not found');
+            if (! $product) {
+                throw (new ModelNotFoundException)->setModel(ProductEntity::class, [$query->slug]);
             }
 
             return $product;
@@ -51,24 +51,23 @@ final class CatalogService
         });
     }
 
-
     private function applyFilters($builder, ListProductsQuery $query): void
     {
         if ($query->categorySlug) {
             $builder->whereHas(
                 'category',
-                fn($q) => $q->where('slug', $query->categorySlug)
+                fn ($q) => $q->where('slug', $query->categorySlug)
             );
         }
 
         if ($query->brandSlug) {
             $builder->whereHas(
                 'brand',
-                fn($q) => $q->where('slug', $query->brandSlug)
+                fn ($q) => $q->where('slug', $query->brandSlug)
             );
         }
 
-        if (!is_null($query->featured)) {
+        if (! is_null($query->featured)) {
             $builder->where('is_featured', $query->featured);
         }
 

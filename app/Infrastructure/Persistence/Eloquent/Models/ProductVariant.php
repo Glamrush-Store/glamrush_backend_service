@@ -13,6 +13,8 @@ class ProductVariant extends Model implements HasMedia
 {
     use HasUlids, InteractsWithMedia;
 
+    public const SELLABLE_STATUSES = ['active', 'published'];
+
     public $incrementing = false;
     protected $fillable = [
         'id',
