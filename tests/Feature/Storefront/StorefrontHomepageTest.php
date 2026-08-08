@@ -1,5 +1,7 @@
 <?php
 
+use App\Infrastructure\Caching\CacheTags;
+use App\Infrastructure\Caching\CacheVersionManager;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Cache;
@@ -21,6 +23,8 @@ beforeEach(function () {
         $table->string('slug')->unique();
         $table->string('parent_id')->nullable();
         $table->boolean('is_active')->default(true);
+        $table->string('announcement_primary_text')->nullable();
+        $table->string('announcement_secondary_text')->nullable();
         $table->timestamps();
     });
     Schema::create('brands', function ($table) {
@@ -263,15 +267,27 @@ it('returns a fully shaped homepage and handles empty content', function () {
             'success' => true,
             'message' => 'Success',
             'data' => [
-                'storefront' => ['slug' => 'fragrances', 'name' => 'Fragrances'],
+                'storefront' => [
+                    'slug' => 'fragrances',
+                    'name' => 'Fragrances',
+                    'announcement' => [
+                        'primary_text' => null,
+                        'secondary_text' => null,
+                    ],
+                ],
                 'campaign' => null,
                 'sections' => [],
             ],
         ]);
 
-    expect($response->headers->get('Cache-Control'))->toContain('public', 'max-age=60', 's-maxage=300')
+    expect($response->headers->get('Cache-Control'))->toContain('public', 'max-age=60', 's-maxage=60')
         ->and($response->headers->get('ETag'))->not->toBeNull()
-        ->and(Cache::tags(['storefronts', 'categories'])->has('storefront:context:fragrances:v1'))->toBeTrue();
+        ->and(Cache::tags(['storefronts', 'categories'])->has(
+            app(CacheVersionManager::class)->versionedKey(
+                'storefront:context:fragrances:v1',
+                [CacheTags::STOREFRONTS, CacheTags::CATEGORIES],
+            ),
+        ))->toBeTrue();
 
     $this->withHeader('If-None-Match', $response->headers->get('ETag'))
         ->getJson('/api/v1/storefronts/fragrances/homepage')
@@ -280,6 +296,29 @@ it('returns a fully shaped homepage and handles empty content', function () {
     $this->getJson('/api/v1/storefronts/unknown/homepage')
         ->assertNotFound()
         ->assertJsonPath('success', false);
+
+    $this->getJson('/api/v1/storefronts/fragrances/configuration')
+        ->assertOk()
+        ->assertJsonPath('data.announcement.primary_text', null)
+        ->assertJsonPath('data.announcement.secondary_text', null);
+});
+
+it('publishes the storefront announcement configured by an administrator', function () {
+    DB::table('categories')->where('slug', 'fragrances')->update([
+        'announcement_primary_text' => 'Free delivery today',
+        'announcement_secondary_text' => 'Book a private scent consultation',
+    ]);
+
+    $this->getJson('/api/v1/storefronts/fragrances/homepage')
+        ->assertOk()
+        ->assertJsonPath('data.storefront.announcement.primary_text', 'Free delivery today')
+        ->assertJsonPath('data.storefront.announcement.secondary_text', 'Book a private scent consultation');
+
+    $this->getJson('/api/v1/storefronts/fragrances/configuration')
+        ->assertOk()
+        ->assertHeaderMissing('ETag')
+        ->assertJsonPath('data.announcement.primary_text', 'Free delivery today')
+        ->assertJsonPath('data.announcement.secondary_text', 'Book a private scent consultation');
 });
 
 it('selects only the highest priority currently published campaign', function () {

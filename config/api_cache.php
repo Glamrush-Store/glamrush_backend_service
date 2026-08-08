@@ -6,7 +6,7 @@ return [
     'shipping_ttl' => (int) env('SHIPPING_CACHE_TTL', 300),
     'http' => [
         'max_age' => (int) env('PUBLIC_HTTP_CACHE_MAX_AGE', 60),
-        'shared_max_age' => (int) env('PUBLIC_HTTP_CACHE_SHARED_MAX_AGE', 300),
-        'stale_while_revalidate' => (int) env('PUBLIC_HTTP_CACHE_STALE_WHILE_REVALIDATE', 30),
+        'shared_max_age' => (int) env('PUBLIC_HTTP_CACHE_SHARED_MAX_AGE', 60),
+        'stale_while_revalidate' => (int) env('PUBLIC_HTTP_CACHE_STALE_WHILE_REVALIDATE', 15),
     ],
 ];

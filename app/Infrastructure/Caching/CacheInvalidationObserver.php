@@ -96,7 +96,9 @@ final class CacheInvalidationObserver implements ShouldHandleEventsAfterCommit
         };
 
         if ($tags !== []) {
-            QueryCache::forget(array_values(array_unique($tags)));
+            $tags = array_values(array_unique($tags));
+            app(CacheVersionManager::class)->bumpForTags($tags);
+            QueryCache::forget($tags);
         }
     }
 

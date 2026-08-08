@@ -21,6 +21,7 @@ use App\Infrastructure\Persistence\Eloquent\Models\AttributeType;
 use App\Infrastructure\Persistence\Eloquent\Models\Brand;
 use App\Infrastructure\Persistence\Eloquent\Models\Category;
 use App\Infrastructure\Persistence\Eloquent\Models\CollectionProduct;
+use App\Infrastructure\Persistence\Eloquent\Models\ContentPage;
 use App\Infrastructure\Persistence\Eloquent\Models\PaymentMethod;
 use App\Infrastructure\Persistence\Eloquent\Models\Product;
 use App\Infrastructure\Persistence\Eloquent\Models\ProductAttribute;
@@ -160,6 +161,7 @@ class AppServiceProvider extends ServiceProvider
             'product' => Product::class,
             'product_variant' => ProductVariant::class,
             'storefront_campaign' => StorefrontCampaign::class,
+            'content_page' => ContentPage::class,
             'user' => User::class,
         ]);
 

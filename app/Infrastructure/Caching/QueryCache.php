@@ -38,6 +38,7 @@ final class QueryCache
             return $callback();
         }
 
+        $key = app(CacheVersionManager::class)->versionedKey($key, $tags);
         $missing = new \stdClass;
 
         try {

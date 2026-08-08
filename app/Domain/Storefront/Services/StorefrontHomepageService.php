@@ -39,7 +39,7 @@ final class StorefrontHomepageService
     public function get(string $storefront): array
     {
         $ttl = max(0, (int) config('storefront.homepage.cache_ttl', 300));
-        $key = "storefront:{$storefront}:homepage:v2";
+        $key = "storefront:{$storefront}:homepage:v4";
 
         if ($ttl === 0) {
             return $this->build($storefront);
@@ -59,7 +59,13 @@ final class StorefrontHomepageService
             ->where('slug', $storefront)
             ->whereNull('parent_id')
             ->where('is_active', true)
-            ->firstOrFail(['id', 'name', 'slug']);
+            ->firstOrFail([
+                'id',
+                'name',
+                'slug',
+                'announcement_primary_text',
+                'announcement_secondary_text',
+            ]);
 
         $campaign = StorefrontCampaign::query()
             ->forStorefront($storefront)
@@ -78,6 +84,10 @@ final class StorefrontHomepageService
             'storefront' => [
                 'slug' => $root->slug,
                 'name' => $root->name,
+                'announcement' => [
+                    'primary_text' => $root->announcement_primary_text,
+                    'secondary_text' => $root->announcement_secondary_text,
+                ],
             ],
             'campaign' => $this->campaignData($campaign),
             'sections' => $sections

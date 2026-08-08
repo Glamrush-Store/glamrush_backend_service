@@ -18,6 +18,7 @@ class Category extends Model implements HasMedia
 
     protected $casts = [
         'is_active' => 'boolean',
+        'deleted_at' => 'datetime',
     ];
 
     public function parent()

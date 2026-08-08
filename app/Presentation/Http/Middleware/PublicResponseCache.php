@@ -17,8 +17,8 @@ final class PublicResponseCache
         }
 
         $maxAge = max(0, (int) config('api_cache.http.max_age', 60));
-        $sharedMaxAge = max($maxAge, (int) config('api_cache.http.shared_max_age', 300));
-        $staleWhileRevalidate = max(0, (int) config('api_cache.http.stale_while_revalidate', 30));
+        $sharedMaxAge = max($maxAge, (int) config('api_cache.http.shared_max_age', 60));
+        $staleWhileRevalidate = max(0, (int) config('api_cache.http.stale_while_revalidate', 15));
 
         $response->headers->set('Cache-Control', implode(', ', [
             'public',
