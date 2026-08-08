@@ -31,4 +31,9 @@ final class StorefrontContext
     {
         return $this->categoryIds;
     }
+
+    public function rootCategoryId(): ?string
+    {
+        return $this->categoryIds[0] ?? null;
+    }
 }

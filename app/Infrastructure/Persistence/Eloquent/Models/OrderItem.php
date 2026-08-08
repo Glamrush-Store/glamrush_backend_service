@@ -22,6 +22,8 @@ class OrderItem extends Model
         'sku',
         'unit_price',
         'quantity',
+        'line_subtotal',
+        'discount_amount',
         'line_total',
         'product_snapshot',
     ];
@@ -31,6 +33,8 @@ class OrderItem extends Model
         return [
             'unit_price'       => 'decimal:2',
             'line_total'       => 'decimal:2',
+            'line_subtotal'    => 'decimal:2',
+            'discount_amount'  => 'decimal:2',
             'quantity'         => 'integer',
             'product_snapshot' => 'array',
         ];

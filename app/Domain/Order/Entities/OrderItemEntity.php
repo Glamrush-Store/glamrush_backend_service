@@ -14,6 +14,8 @@ final class OrderItemEntity
         public readonly string $sku,
         public readonly float $unitPrice,
         public readonly int $quantity,
+        public readonly string $lineSubtotal,
+        public readonly string $discountAmount,
         public readonly string $lineTotal,
         public readonly ?array $productSnapshot,
     ) {

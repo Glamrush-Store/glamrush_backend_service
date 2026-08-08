@@ -25,6 +25,7 @@ use App\Presentation\Http\Controllers\Catalog\SyncSavedItemsController;
 use App\Presentation\Http\Controllers\Catalog\UpdateCartItemByIdController;
 use App\Presentation\Http\Controllers\Catalog\UpdateCartItemController;
 use App\Presentation\Http\Controllers\Checkout\CheckoutCartController;
+use App\Presentation\Http\Controllers\Discount\ValidateDiscountController;
 use App\Presentation\Http\Controllers\Customer\DeleteAddressController;
 use App\Presentation\Http\Controllers\Customer\ListAddressesController;
 use App\Presentation\Http\Controllers\Customer\SetDefaultAddressController;
@@ -100,6 +101,8 @@ Route::prefix('v1')->middleware('throttle:api')->group(function () {
 
             Route::post('/checkout/cart', CheckoutCartController::class)
                 ->middleware(['cart.identifier', 'idempotency.required', 'throttle:checkout-payment']);
+            Route::post('/discounts/validate', ValidateDiscountController::class)
+                ->middleware(['cart.identifier', 'throttle:checkout-payment']);
         });
 
     // ======================================================

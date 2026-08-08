@@ -5,6 +5,7 @@ namespace App\Infrastructure\Persistence\Eloquent\Repositories;
 use App\Domain\Catalog\Cart\CartIdentifier;
 use App\Domain\Catalog\Cart\Exceptions\InsufficientStockException;
 use App\Domain\Catalog\Storefront\StorefrontContext;
+use App\Domain\Discount\Services\DiscountService;
 use App\Domain\Order\Actions\GenerateOrderNumberAction;
 use App\Domain\Order\Contracts\CheckoutRepository;
 use App\Domain\Order\Entities\CheckoutResult;
@@ -26,6 +27,7 @@ final class EloquentCheckoutRepository implements CheckoutRepository
         private readonly GenerateOrderNumberAction $generateOrderNumber,
         private readonly StorefrontContext $storefrontContext,
         private readonly OutboxService $outbox,
+        private readonly DiscountService $discounts,
     ) {}
 
     public function createPendingOrderFromCart(
@@ -35,6 +37,7 @@ final class EloquentCheckoutRepository implements CheckoutRepository
         ?array $billingAddressPayload,
         string $shippingRateId,
         string $paymentMethod,
+        ?string $discountCode,
         ?int $userId,
         string $idempotencyOwner,
         string $idempotencyKey,
@@ -46,6 +49,7 @@ final class EloquentCheckoutRepository implements CheckoutRepository
             $shippingAddressPayload,
             $billingAddressPayload,
             $shippingRateId,
+            $discountCode,
             $userId,
             $idempotencyOwner,
             $idempotencyKey,
@@ -114,6 +118,10 @@ final class EloquentCheckoutRepository implements CheckoutRepository
                     'quantity' => (int) $cartItem->quantity,
                     'unit_price' => $unitPrice,
                     'line_total' => $lineTotal,
+                    'category_id' => (string) $product->category_id,
+                    'brand_id' => $product->brand_id ? (string) $product->brand_id : null,
+                    'collection_ids' => $product->collections->pluck('id')->map(fn ($id) => (string) $id)->all(),
+                    'is_on_sale' => $this->variantIsOnSale($variant),
                 ];
             }
 
@@ -125,6 +133,31 @@ final class EloquentCheckoutRepository implements CheckoutRepository
 
             $shippingAmount = $this->calculateShippingAmount($rate, $subtotal);
 
+            $discount = null;
+            if ($discountCode !== null && trim($discountCode) !== '') {
+                $discount = $this->discounts->calculate(
+                    code: $discountCode,
+                    lines: array_map(fn (array $item) => [
+                        'product_id' => (string) $item['product']->id,
+                        'variant_id' => (string) $item['variant']->id,
+                        'category_id' => $item['category_id'],
+                        'brand_id' => $item['brand_id'],
+                        'collection_ids' => $item['collection_ids'],
+                        'quantity' => $item['quantity'],
+                        'line_subtotal' => $item['line_total'],
+                        'is_on_sale' => $item['is_on_sale'],
+                    ], $reservedItems),
+                    shippingAmount: $shippingAmount,
+                    userId: $userId,
+                    guestId: $cartIdentifier->cartToken,
+                    email: $shippingAddressPayload['email'] ?? null,
+                    lockForUpdate: true,
+                );
+            }
+
+            $discountAmount = (float) ($discount['discount_amount'] ?? 0);
+            $shippingDiscountAmount = (float) ($discount['shipping_discount_amount'] ?? 0);
+
             $order = Order::create([
                 'user_id' => $userId,
                 'guest_id' => $cartIdentifier->cartToken,
@@ -133,9 +166,14 @@ final class EloquentCheckoutRepository implements CheckoutRepository
                 'idempotency_request_hash' => $requestHash,
                 'order_number' => $this->generateOrderNumber->run(),
                 'status' => 'pending_payment',
+                'discount_code_id' => $discount['discount_code_id'] ?? null,
+                'discount_code' => $discount['code'] ?? null,
                 'subtotal' => $subtotal,
+                'discount_amount' => $discountAmount,
                 'shipping_amount' => $shippingAmount,
-                'total' => $subtotal + $shippingAmount,
+                'shipping_discount_amount' => $shippingDiscountAmount,
+                'discount_snapshot' => $discount['snapshot'] ?? null,
+                'total' => max(0, $subtotal - $discountAmount + $shippingAmount - $shippingDiscountAmount),
                 'currency' => 'NGN',
                 'shipping_rate_id' => $rate->id,
                 'shipping_method_name' => $rate->method->name,
@@ -146,7 +184,7 @@ final class EloquentCheckoutRepository implements CheckoutRepository
                 'placed_at' => now(),
             ]);
 
-            foreach ($reservedItems as $reserved) {
+            foreach ($reservedItems as $index => $reserved) {
                 $product = $reserved['product'];
                 $variant = $reserved['variant'];
 
@@ -158,7 +196,9 @@ final class EloquentCheckoutRepository implements CheckoutRepository
                     'sku' => $variant->sku,
                     'unit_price' => $reserved['unit_price'],
                     'quantity' => $reserved['quantity'],
-                    'line_total' => $reserved['line_total'],
+                    'line_subtotal' => $reserved['line_total'],
+                    'discount_amount' => $discount['line_discounts'][$index] ?? 0,
+                    'line_total' => $reserved['line_total'] - ($discount['line_discounts'][$index] ?? 0),
                     'product_snapshot' => [
                         'product_id' => $product->id,
                         'variant_id' => $variant->id,
@@ -170,6 +210,10 @@ final class EloquentCheckoutRepository implements CheckoutRepository
                         'images' => $this->orderItemImages($variant, $product),
                     ],
                 ]);
+            }
+
+            if ($discount !== null) {
+                $this->discounts->reserve($discount, $order, $userId, $cartIdentifier->cartToken);
             }
 
             CartItem::query()
@@ -191,7 +235,7 @@ final class EloquentCheckoutRepository implements CheckoutRepository
     {
         return CartItem::query()
             ->with([
-                'product' => fn ($query) => $query->withoutGlobalScopes()->with('media'),
+                'product' => fn ($query) => $query->withoutGlobalScopes()->with(['media', 'collections']),
                 'product.defaultVariant.media',
                 'variant.media',
             ])
@@ -306,23 +350,18 @@ final class EloquentCheckoutRepository implements CheckoutRepository
 
     private function effectiveVariantPrice(ProductVariant $variant): float
     {
-        $now = now();
-
-        $saleStarted = $variant->sale_starts_at === null
-            || $now->greaterThanOrEqualTo($variant->sale_starts_at);
-
-        $saleNotEnded = $variant->sale_ends_at === null
-            || $now->lessThanOrEqualTo($variant->sale_ends_at);
-
-        if (
-            $variant->sale_price !== null &&
-            $saleStarted &&
-            $saleNotEnded
-        ) {
+        if ($this->variantIsOnSale($variant)) {
             return (float) $variant->sale_price;
         }
 
         return (float) $variant->price;
+    }
+
+    private function variantIsOnSale(ProductVariant $variant): bool
+    {
+        return $variant->sale_price !== null
+            && ($variant->sale_starts_at === null || now()->greaterThanOrEqualTo($variant->sale_starts_at))
+            && ($variant->sale_ends_at === null || now()->lessThanOrEqualTo($variant->sale_ends_at));
     }
 
     private function orderItemImages(ProductVariant $variant, $product): array
