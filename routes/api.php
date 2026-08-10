@@ -214,4 +214,11 @@ Route::prefix('v1')->middleware('throttle:api')->group(function () {
         ->whereIn('provider', ['paystack', 'flutterwave']);
 });
 
-Route::get('/test', fn () => 'test worked');
+Route::get('/test', fn() => 'test worked');
+
+// ========================================================
+// Liveliness Test Route
+// ========================================================
+Route::prefix('v1')->group(function () {
+    Route::get('/up', fn() => response()->json(['status' => 'ok']));
+});

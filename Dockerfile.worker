@@ -1,0 +1,80 @@
+FROM php:8.3-cli-bookworm AS worker
+
+ARG UID=1000
+ARG GID=1000
+
+ENV COMPOSER_ALLOW_SUPERUSER=1 \
+    RUN_MIGRATIONS=false \
+    CACHE_CONFIG=true \
+    QUEUE_CONNECTION=redis \
+    REDIS_QUEUE=glamrush-storefront \
+    QUEUE_WORKER_SLEEP=3 \
+    QUEUE_WORKER_TRIES=3 \
+    QUEUE_WORKER_BACKOFF=5 \
+    QUEUE_WORKER_TIMEOUT=60 \
+    QUEUE_WORKER_MAX_TIME=3600 \
+    QUEUE_WORKER_MEMORY=256
+
+WORKDIR /var/www/html
+
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends \
+        ca-certificates \
+        curl \
+        git \
+        libfreetype6-dev \
+        libicu-dev \
+        libjpeg62-turbo-dev \
+        libpng-dev \
+        libpq-dev \
+        librdkafka-dev \
+        libwebp-dev \
+        libzip-dev \
+        procps \
+        supervisor \
+        unzip \
+    && docker-php-ext-configure gd --with-freetype --with-jpeg --with-webp \
+    && docker-php-ext-install -j"$(nproc)" \
+        bcmath \
+        exif \
+        gd \
+        intl \
+        pcntl \
+        pdo_pgsql \
+        sockets \
+        zip \
+    && pecl install redis rdkafka \
+    && docker-php-ext-enable opcache redis rdkafka \
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/*
+
+COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
+
+COPY composer.json composer.lock ./
+RUN composer install \
+    --no-dev \
+    --prefer-dist \
+    --no-interaction \
+    --no-progress \
+    --optimize-autoloader \
+    --no-scripts
+
+COPY . .
+
+RUN composer dump-autoload --optimize \
+    && php artisan package:discover --ansi \
+    && mkdir -p storage/framework/cache storage/framework/sessions storage/framework/views bootstrap/cache \
+    && groupadd --gid "${GID}" laravel \
+    && useradd --uid "${UID}" --gid laravel --shell /bin/bash --create-home laravel \
+    && chown -R laravel:laravel storage bootstrap/cache \
+    && chmod +x docker/entrypoint.sh docker/worker-healthcheck.sh
+
+COPY docker/supervisord-worker.conf /etc/supervisord-worker.conf
+
+USER laravel
+
+HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \
+    CMD ["docker/worker-healthcheck.sh"]
+
+ENTRYPOINT ["docker/entrypoint.sh"]
+CMD ["/usr/bin/supervisord", "-c", "/etc/supervisord-worker.conf"]
