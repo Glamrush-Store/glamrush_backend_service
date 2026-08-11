@@ -6,6 +6,7 @@ use App\Domain\Catalog\Cart\CartIdentifier;
 use App\Domain\Catalog\Cart\Exceptions\InsufficientStockException;
 use App\Domain\Catalog\Storefront\StorefrontContext;
 use App\Domain\Discount\Services\DiscountService;
+use App\Domain\Location\Services\LocationService;
 use App\Domain\Order\Actions\GenerateOrderNumberAction;
 use App\Domain\Order\Contracts\CheckoutRepository;
 use App\Domain\Order\Entities\CheckoutResult;
@@ -28,6 +29,7 @@ final class EloquentCheckoutRepository implements CheckoutRepository
         private readonly StorefrontContext $storefrontContext,
         private readonly OutboxService $outbox,
         private readonly DiscountService $discounts,
+        private readonly LocationService $locations,
     ) {}
 
     public function createPendingOrderFromCart(
@@ -295,20 +297,23 @@ final class EloquentCheckoutRepository implements CheckoutRepository
 
     private function findBestZoneForAddress(ShippingAddressEntity $address): ?ShippingZone
     {
+        $countries = $this->locations->countryIdentifiers($address->country);
+        $states = $this->locations->stateIdentifiers($address->country, $address->state);
+
         return ShippingZone::query()
             ->where('is_active', true)
-            ->where('country', $address->country)
-            ->where(function ($query) use ($address) {
+            ->whereIn('country', $countries)
+            ->where(function ($query) use ($address, $states) {
                 if ($address->state && $address->city) {
-                    $query->orWhere(function ($q) use ($address) {
-                        $q->where('state', $address->state)
+                    $query->orWhere(function ($q) use ($address, $states) {
+                        $q->whereIn('state', $states)
                             ->where('city', $address->city);
                     });
                 }
 
                 if ($address->state) {
-                    $query->orWhere(function ($q) use ($address) {
-                        $q->where('state', $address->state)
+                    $query->orWhere(function ($q) use ($states) {
+                        $q->whereIn('state', $states)
                             ->whereNull('city');
                     });
                 }
@@ -318,21 +323,7 @@ final class EloquentCheckoutRepository implements CheckoutRepository
                         ->whereNull('city');
                 });
             })
-            ->orderByRaw(
-                '
-                CASE
-                    WHEN state = ? AND city = ? THEN 1
-                    WHEN state = ? AND city IS NULL THEN 2
-                    WHEN state IS NULL AND city IS NULL THEN 3
-                    ELSE 4
-                END
-                ',
-                [
-                    $address->state,
-                    $address->city,
-                    $address->state,
-                ]
-            )
+            ->orderByRaw('CASE WHEN city = ? THEN 1 WHEN state IS NOT NULL THEN 2 ELSE 3 END', [$address->city])
             ->first();
     }
 
