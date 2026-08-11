@@ -35,6 +35,9 @@ use App\Presentation\Http\Controllers\Customer\ShowAddressController;
 use App\Presentation\Http\Controllers\Customer\StoreAddressController;
 use App\Presentation\Http\Controllers\Customer\UpdateAddressController;
 use App\Presentation\Http\Controllers\Discount\ValidateDiscountController;
+use App\Presentation\Http\Controllers\Location\ListCountriesController;
+use App\Presentation\Http\Controllers\Location\ListCountryStatesController;
+use App\Presentation\Http\Controllers\Location\ListStateCitiesController;
 use App\Presentation\Http\Controllers\Newsletter\ConfirmNewsletterSubscriptionController;
 use App\Presentation\Http\Controllers\Newsletter\ResendNewsletterConfirmationController;
 use App\Presentation\Http\Controllers\Newsletter\SubscribeNewsletterController;
@@ -59,6 +62,12 @@ Route::get('/user', function (Request $request) {
 // ========================================================
 
 Route::prefix('v1')->middleware('throttle:api')->group(function () {
+    Route::prefix('locations')->middleware(['public.cache', 'throttle:catalog'])->group(function () {
+        Route::get('/countries', ListCountriesController::class);
+        Route::get('/countries/{country}/states', ListCountryStatesController::class);
+        Route::get('/countries/{country}/states/{state}/cities', ListStateCitiesController::class);
+    });
+
     Route::prefix('newsletter/subscriptions')->group(function () {
         Route::post('/', SubscribeNewsletterController::class)->middleware('throttle:newsletter-subscribe');
         Route::get('/confirm/{token}', ConfirmNewsletterSubscriptionController::class)
@@ -214,11 +223,11 @@ Route::prefix('v1')->middleware('throttle:api')->group(function () {
         ->whereIn('provider', ['paystack', 'flutterwave']);
 });
 
-Route::get('/test', fn() => 'test worked');
+Route::get('/test', fn () => 'test worked');
 
 // ========================================================
 // Liveliness Test Route
 // ========================================================
 Route::prefix('v1')->group(function () {
-    Route::get('/up', fn() => response()->json(['status' => 'ok']));
+    Route::get('/up', fn () => response()->json(['status' => 'ok']));
 });

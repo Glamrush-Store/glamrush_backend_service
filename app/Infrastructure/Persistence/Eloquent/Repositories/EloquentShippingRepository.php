@@ -8,6 +8,7 @@
 
 namespace App\Infrastructure\Persistence\Eloquent\Repositories;
 
+use App\Domain\Location\Services\LocationService;
 use App\Domain\Shipping\Contracts\ShippingRepository;
 use App\Domain\Shipping\Entities\ShippingAddressEntity;
 use App\Domain\Shipping\Entities\ShippingRateEntity;
@@ -21,6 +22,8 @@ use App\Infrastructure\Persistence\Eloquent\Models\ShippingZone;
 
 class EloquentShippingRepository implements ShippingRepository
 {
+    public function __construct(private readonly LocationService $locations) {}
+
     public function findBestZoneForAddress(ShippingAddressEntity $address): ?ShippingZoneEntity
     {
         $key = 'shipping:zone:'.md5(json_encode([
@@ -35,20 +38,23 @@ class EloquentShippingRepository implements ShippingRepository
             [CacheTags::SHIPPING],
             (int) config('api_cache.shipping_ttl', 300),
             function () use ($address): ?ShippingZoneEntity {
+                $countries = $this->locations->countryIdentifiers($address->country);
+                $states = $this->locations->stateIdentifiers($address->country, $address->state);
+
                 $model = ShippingZone::query()
                     ->where('is_active', true)
-                    ->where('country', $address->country)
-                    ->where(function ($query) use ($address) {
+                    ->whereIn('country', $countries)
+                    ->where(function ($query) use ($address, $states) {
                         if ($address->state && $address->city) {
-                            $query->orWhere(function ($q) use ($address) {
-                                $q->where('state', $address->state)
+                            $query->orWhere(function ($q) use ($address, $states) {
+                                $q->whereIn('state', $states)
                                     ->where('city', $address->city);
                             });
                         }
 
                         if ($address->state) {
-                            $query->orWhere(function ($q) use ($address) {
-                                $q->where('state', $address->state)
+                            $query->orWhere(function ($q) use ($states) {
+                                $q->whereIn('state', $states)
                                     ->whereNull('city');
                             });
                         }
@@ -58,21 +64,7 @@ class EloquentShippingRepository implements ShippingRepository
                                 ->whereNull('city');
                         });
                     })
-                    ->orderByRaw(
-                        '
-            CASE
-                WHEN state = ? AND city = ? THEN 1
-                WHEN state = ? AND city IS NULL THEN 2
-                WHEN state IS NULL AND city IS NULL THEN 3
-                ELSE 4
-            END
-            ',
-                        [
-                            $address->state,
-                            $address->city,
-                            $address->state,
-                        ]
-                    )
+                    ->orderByRaw('CASE WHEN city = ? THEN 1 WHEN state IS NOT NULL THEN 2 ELSE 3 END', [$address->city])
                     ->first();
 
                 return $model ? ShippingZoneMapper::toDomain($model) : null;
