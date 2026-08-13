@@ -30,7 +30,6 @@ beforeEach(function () {
         $table->boolean('manage_stock')->default(false);
         $table->integer('stock_quantity')->default(0);
         $table->boolean('in_stock')->default(true);
-        $table->string('category_id')->nullable();
         $table->timestamps();
     });
 
@@ -41,6 +40,17 @@ beforeEach(function () {
         $table->string('parent_id')->nullable();
         $table->boolean('is_active')->default(true);
         $table->timestamps();
+    });
+
+    Schema::create('category_product', function ($table) {
+        $table->string('id')->primary();
+        $table->string('product_id');
+        $table->string('category_id');
+        $table->boolean('is_primary')->default(false);
+        $table->unsignedInteger('sequence')->default(0);
+        $table->timestamps();
+
+        $table->unique(['product_id', 'category_id']);
     });
 
     Schema::create('product_variants', function ($table) {
@@ -184,6 +194,19 @@ function cartProduct(array $overrides = []): Product
         'published_at' => now()->subDay(),
         'type' => 'simple',
     ], $overrides));
+
+    $categoryId = $overrides['category_id'] ?? null;
+    if ($categoryId) {
+        DB::table('category_product')->insert([
+            'id' => (string) Str::ulid(),
+            'product_id' => $product->id,
+            'category_id' => $categoryId,
+            'is_primary' => true,
+            'sequence' => 0,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+    }
 
     cartVariant($product, [
         'is_default' => true,

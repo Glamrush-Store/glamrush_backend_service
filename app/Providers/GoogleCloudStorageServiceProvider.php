@@ -39,9 +39,9 @@ class GoogleCloudStorageServiceProvider extends ServiceProvider
             ];
 
             // Support both key_file and key_file_contents
-            if (isset($config['key_file'])) {
+            if (! empty($config['key_file'])) {
                 $clientConfig['keyFilePath'] = $config['key_file'];
-            } elseif (isset($config['key_file_contents'])) {
+            } elseif (! empty($config['key_file_contents'])) {
                 $clientConfig['keyFile'] = json_decode($config['key_file_contents'], true);
             }
 
@@ -60,7 +60,7 @@ class GoogleCloudStorageServiceProvider extends ServiceProvider
             $bucket = $storageClient->bucket($config['bucket']);
 
             // Verify bucket is accessible
-            if (!$bucket->exists()) {
+            if (! $bucket->exists()) {
                 throw new Exception("Bucket {$config['bucket']} does not exist or is not accessible");
             }
 

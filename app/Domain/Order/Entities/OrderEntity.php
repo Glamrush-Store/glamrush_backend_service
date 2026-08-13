@@ -12,6 +12,7 @@ final class OrderEntity
         public readonly ?string $guestId,
         public readonly string $orderNumber,
         public readonly string $status,
+        public readonly ?string $paymentMethodCode,
         public readonly ?string $discountCode,
         public readonly float $subtotal,
         public readonly float $discountAmount,

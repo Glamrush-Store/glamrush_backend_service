@@ -20,6 +20,7 @@ return Application::configure(basePath: dirname(__DIR__))
     )
     ->withMiddleware(function (Middleware $middleware): void {
         $middleware->statefulApi();
+        $middleware->prepend(App\Presentation\Http\Middleware\ApplyRuntimeSettings::class);
         $middleware->append(App\Presentation\Http\Middleware\ForceJsonResponse::class);
 
         $middleware->alias([

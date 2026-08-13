@@ -17,12 +17,24 @@ final class OrderMapper
             ? $model->items->map(fn(OrderItem $item) => self::itemToDomain($item))->all()
             : null;
 
+        $paymentMethodCode = null;
+
+        if ($model->relationLoaded('payments')) {
+            $payment = $model->payments
+                ->sortByDesc(fn ($payment) => $payment->created_at?->getTimestamp() ?? 0)
+                ->first();
+            $paymentMethodCode = $payment?->relationLoaded('paymentMethod')
+                ? $payment->paymentMethod?->code
+                : null;
+        }
+
         return new OrderEntity(
             id: (string)$model->id,
             userId: $model->user_id !== null ? (string)$model->user_id : null,
             guestId: $model->guest_id,
             orderNumber: $model->order_number,
             status: $model->status->value,
+            paymentMethodCode: $paymentMethodCode,
             discountCode: $model->discount_code,
             subtotal: (string)$model->subtotal,
             discountAmount: (string)($model->discount_amount ?? 0),

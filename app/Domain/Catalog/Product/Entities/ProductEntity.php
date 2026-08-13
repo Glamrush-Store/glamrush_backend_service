@@ -35,6 +35,7 @@ final class ProductEntity
         public int $stockQuantity,
         private bool $inStock,
         private array $variants = [],
+        public readonly array $categories = [],
     ) {}
 
     /* ------------------------------------------
@@ -142,3 +143,4 @@ final class ProductEntity
         return $this->variants;
     }
 }
+

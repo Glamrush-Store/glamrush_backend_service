@@ -20,6 +20,7 @@ use App\Infrastructure\Persistence\Eloquent\Models\ShippingRate;
 use App\Infrastructure\Persistence\Eloquent\Models\ShippingZone;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 use RuntimeException;
 
 final class EloquentCheckoutRepository implements CheckoutRepository
@@ -121,8 +122,11 @@ final class EloquentCheckoutRepository implements CheckoutRepository
                     'unit_price' => $unitPrice,
                     'line_total' => $lineTotal,
                     'category_id' => (string) $product->category_id,
+                    'category_ids' => $product->categories->pluck('id')->map(fn ($id) => (string) $id)->all(),
                     'brand_id' => $product->brand_id ? (string) $product->brand_id : null,
-                    'collection_ids' => $product->collections->pluck('id')->map(fn ($id) => (string) $id)->all(),
+                    'collection_ids' => Schema::hasTable('collections') && $product->relationLoaded('collections')
+                        ? $product->collections->pluck('id')->map(fn ($id) => (string) $id)->all()
+                        : [],
                     'is_on_sale' => $this->variantIsOnSale($variant),
                 ];
             }
@@ -143,6 +147,7 @@ final class EloquentCheckoutRepository implements CheckoutRepository
                         'product_id' => (string) $item['product']->id,
                         'variant_id' => (string) $item['variant']->id,
                         'category_id' => $item['category_id'],
+                        'category_ids' => $item['category_ids'],
                         'brand_id' => $item['brand_id'],
                         'collection_ids' => $item['collection_ids'],
                         'quantity' => $item['quantity'],
@@ -237,7 +242,7 @@ final class EloquentCheckoutRepository implements CheckoutRepository
     {
         return CartItem::query()
             ->with([
-                'product' => fn ($query) => $query->withoutGlobalScopes()->with(['media', 'collections']),
+                'product' => fn ($query) => $query->withoutGlobalScopes()->with($this->productCheckoutRelations()),
                 'product.defaultVariant.media',
                 'variant.media',
             ])
@@ -245,9 +250,20 @@ final class EloquentCheckoutRepository implements CheckoutRepository
             ->when($this->storefrontContext->isActive(), function (Builder $query) {
                 $query->whereHas('product', fn (Builder $productQuery) => $productQuery
                     ->withoutGlobalScopes()
-                    ->whereIn('category_id', $this->storefrontContext->categoryIds()));
+                    ->whereHas('categories', fn (Builder $categoryQuery) => $categoryQuery->whereIn('categories.id', $this->storefrontContext->categoryIds())));
             })
             ->get();
+    }
+
+    private function productCheckoutRelations(): array
+    {
+        $relations = ['media', 'categories', 'primaryCategory'];
+
+        if (Schema::hasTable('collections') && Schema::hasTable('collection_product')) {
+            $relations[] = 'collections';
+        }
+
+        return $relations;
     }
 
     private function constrainCart(Builder $query, CartIdentifier $cartIdentifier): void
@@ -382,3 +398,5 @@ final class EloquentCheckoutRepository implements CheckoutRepository
             ->all();
     }
 }
+
+

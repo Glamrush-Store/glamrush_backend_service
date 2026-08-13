@@ -41,7 +41,7 @@ return [
         'public' => [
             'driver' => 'local',
             'root' => storage_path('app/public'),
-            'url' => env('APP_URL') . '/storage',
+            'url' => env('APP_URL').'/storage',
             'visibility' => 'public',
             'throw' => false,
             'report' => false,
@@ -66,8 +66,11 @@ return [
             'bucket' => env('GCP_BUCKET'),
             'path_prefix' => env('GCP_PATH_PREFIX', ''),
             'key_file' => env('GOOGLE_APPLICATION_CREDENTIALS', null),
+            'key_file_base64' => env('GOOGLE_APPLICATION_CREDENTIALS_BASE64'),
+            'use_key_file' => env('USE_GCP_KEY_FILE', true),
+            'visibility' => env('VISIBILITY', 'public'),
             'throw' => true,
-            'url' => 'https://storage.googleapis.com/' . env('GCP_BUCKET'),
+            'url' => 'https://storage.googleapis.com/'.env('GCP_BUCKET'),
         ],
 
     ],

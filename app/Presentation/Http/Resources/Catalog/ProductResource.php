@@ -41,6 +41,20 @@ class ProductResource extends JsonResource
                 ]
                 : null,
 
+            'primary_category' => $this->category
+                ? [
+                    'id' => $this->category->id,
+                    'name' => $this->category->name,
+                    'slug' => $this->category->slug,
+                ]
+                : null,
+
+            'categories' => array_map(fn ($category) => [
+                'id' => $category->id,
+                'name' => $category->name,
+                'slug' => $category->slug,
+            ], $this->categories),
+
             'brand' => $this->brand
                 ? [
                     'id' => $this->brand->id,
@@ -72,3 +86,5 @@ class ProductResource extends JsonResource
         ];
     }
 }
+
+

@@ -25,13 +25,13 @@ final class DiscountService
     ): array {
         $items = CartItem::query()
             ->with([
-                'product' => fn ($query) => $query->withoutGlobalScopes()->with('collections'),
+                'product' => fn ($query) => $query->withoutGlobalScopes()->with(['collections', 'categories', 'primaryCategory']),
                 'product.defaultVariant',
                 'variant',
             ])
             ->tap(fn (Builder $query) => $this->constrainCart($query, $cartIdentifier))
             ->whereHas('product', fn (Builder $query) => $query->withoutGlobalScopes()
-                ->whereIn('category_id', $this->storefrontContext->categoryIds()))
+                ->whereHas('categories', fn (Builder $categoryQuery) => $categoryQuery->whereIn('categories.id', $this->storefrontContext->categoryIds())))
             ->get();
 
         if ($items->isEmpty()) {
@@ -49,6 +49,7 @@ final class DiscountService
                 'product_id' => (string) $item->product->id,
                 'variant_id' => (string) $variant->id,
                 'category_id' => (string) $item->product->category_id,
+                'category_ids' => $item->product->categories->pluck('id')->map(fn ($id) => (string) $id)->all(),
                 'brand_id' => $item->product->brand_id ? (string) $item->product->brand_id : null,
                 'collection_ids' => $item->product->collections->pluck('id')->map(fn ($id) => (string) $id)->all(),
                 'quantity' => (int) $item->quantity,
@@ -230,7 +231,9 @@ final class DiscountService
             'product_variant' => $line['variant_id'] === $target->target_id,
             'brand' => $line['brand_id'] === $target->target_id,
             'collection' => in_array($target->target_id, $line['collection_ids'], true),
-            'category' => in_array($target->target_id, $this->categoryLineage($line['category_id']), true),
+            'category' => collect($line['category_ids'] ?? [$line['category_id'] ?? null])
+                ->filter()
+                ->contains(fn (string $categoryId) => in_array($target->target_id, $this->categoryLineage($categoryId), true)),
             default => false,
         };
     }
@@ -290,3 +293,4 @@ final class DiscountService
     private function toCents(mixed $amount): int { return (int) round((float) $amount * 100); }
     private function fromCents(int $amount): float { return $amount / 100; }
 }
+
