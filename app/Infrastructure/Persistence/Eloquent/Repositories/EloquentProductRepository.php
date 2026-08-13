@@ -61,20 +61,18 @@ final class EloquentProductRepository implements ProductRepository
                 'products.is_featured',
                 'products.sort_order',
                 'products.published_at',
-                'products.category_id',
                 'products.brand_id',
             ])
             ->where('slug', $query->slug)
             ->when($query->storefrontRootSlug, function (Builder $builder, string $rootSlug) {
                 $root = Category::query()->where('slug', $rootSlug)->first();
 
-                $builder->whereIn(
-                    'products.category_id',
-                    $root ? $this->getCategoryDescendantIds($root, activeOnly: true) : [],
-                );
+                $builder->whereHas('categories', fn (Builder $categoryQuery) => $categoryQuery
+                    ->whereIn('categories.id', $root ? $this->getCategoryDescendantIds($root, activeOnly: true) : []));
             })
             ->with([
-                'category:id,name,slug,is_active',
+                'categories:id,name,slug,is_active',
+                'primaryCategory:id,name,slug,is_active',
                 'brand:id,name,slug',
                 'variants',
                 'variants.media',
@@ -108,12 +106,12 @@ final class EloquentProductRepository implements ProductRepository
                 'products.in_stock',
                 'products.is_featured',
                 'products.sort_order',
-                'products.category_id',
                 'products.brand_id',
             ])
             ->with([
                 'variants:id,product_id,price,sku,sale_price,sale_starts_at,is_default,sale_ends_at,manage_stock,stock_quantity,in_stock,attributes,sort_order,status',
-                'category:id,name,slug',
+                'categories:id,name,slug',
+                'primaryCategory:id,name,slug',
                 'brand:id,name,slug',
                 'vendor:id,name,slug',
             ]);
@@ -137,17 +135,15 @@ final class EloquentProductRepository implements ProductRepository
     {
         if ($query->storefrontRootSlug) {
             $root = Category::query()->where('slug', $query->storefrontRootSlug)->first();
-            $builder->whereIn(
-                'products.category_id',
-                $root ? $this->getCategoryDescendantIds($root, activeOnly: true) : [],
-            );
+            $builder->whereHas('categories', fn (Builder $categoryQuery) => $categoryQuery
+                ->whereIn('categories.id', $root ? $this->getCategoryDescendantIds($root, activeOnly: true) : []));
         }
 
         if (! in_array('category', $exclude) && $query->categorySlug) {
             $category = Category::where('slug', $query->categorySlug)->first();
             if ($category) {
                 $ids = $this->getCategoryDescendantIds($category);
-                $builder->whereIn('products.category_id', $ids);
+                $builder->whereHas('categories', fn (Builder $categoryQuery) => $categoryQuery->whereIn('categories.id', $ids));
             }
         }
 
@@ -191,7 +187,7 @@ final class EloquentProductRepository implements ProductRepository
                     ->orWhereRaw("LOWER(COALESCE(products.short_description, '')) LIKE ?", [$like])
                     ->orWhereHas('brand', fn (Builder $brandQuery) => $brandQuery
                         ->whereRaw('LOWER(brands.name) LIKE ?', [$like]))
-                    ->orWhereHas('category', fn (Builder $categoryQuery) => $categoryQuery
+                    ->orWhereHas('categories', fn (Builder $categoryQuery) => $categoryQuery
                         ->whereRaw('LOWER(categories.name) LIKE ?', [$like]))
                 );
             }
@@ -353,8 +349,9 @@ final class EloquentProductRepository implements ProductRepository
         }
 
         $categoryQuery = Category::query()
-            ->selectRaw('categories.id, categories.name, categories.slug, COUNT(products.id) as count')
-            ->join('products', 'products.category_id', '=', 'categories.id')
+            ->selectRaw('categories.id, categories.name, categories.slug, COUNT(DISTINCT products.id) as count')
+            ->join('category_product', 'category_product.category_id', '=', 'categories.id')
+            ->join('products', 'products.id', '=', 'category_product.product_id')
             ->whereIn('products.id', $productIds)
             ->groupBy('categories.id', 'categories.name', 'categories.slug')
             ->orderByDesc('count');
@@ -455,3 +452,7 @@ final class EloquentProductRepository implements ProductRepository
         return $facets;
     }
 }
+
+
+
+

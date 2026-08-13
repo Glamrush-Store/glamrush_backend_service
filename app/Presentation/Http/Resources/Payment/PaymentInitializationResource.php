@@ -25,6 +25,11 @@ final class PaymentInitializationResource extends JsonResource
             'reference' => $this->reference,
             'provider' => $this->provider,
             'status' => $this->status,
+            'next_actions' => [
+                'retry_payment' => in_array($this->status, ['failed', 'pending', 'initialized'], true),
+                'restore_cart' => false,
+                'retry_endpoint' => '/api/v1/payments/initialize',
+            ],
         ];
     }
 }

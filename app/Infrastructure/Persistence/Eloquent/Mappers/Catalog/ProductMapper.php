@@ -29,6 +29,7 @@ final class ProductMapper
             sortOrder: (int)$model->sort_order,
             vendor: self::mapVendor($model),
             category: self::mapCategory($model),
+            categories: self::mapCategories($model),
             brand: self::mapBrand($model),
             images: $model->getMedia('catalog-photos')->map(function ($media) {
                 return [
@@ -83,14 +84,37 @@ final class ProductMapper
 
     private static function mapCategory($model): ?CategoryEntity
     {
-        if (!$model->relationLoaded('category') || !$model->category) {
-            return null;
+        if ($model->relationLoaded('primaryCategory') && $model->primaryCategory->isNotEmpty()) {
+            return self::categoryEntity($model->primaryCategory->first());
         }
 
+        if ($model->relationLoaded('categories') && $model->categories->isNotEmpty()) {
+            $primary = $model->categories->first(fn ($category) => (bool) ($category->pivot?->is_primary));
+
+            return self::categoryEntity($primary ?? $model->categories->first());
+        }
+
+        return null;
+    }
+
+    /** @return CategoryEntity[] */
+    private static function mapCategories($model): array
+    {
+        if (! $model->relationLoaded('categories')) {
+            return [];
+        }
+
+        return $model->categories
+            ->map(fn ($category) => self::categoryEntity($category))
+            ->all();
+    }
+
+    private static function categoryEntity($category): CategoryEntity
+    {
         return new CategoryEntity(
-            id: (string)$model->category->id,
-            name: $model->category->name,
-            slug: $model->category->slug,
+            id: (string)$category->id,
+            name: $category->name,
+            slug: $category->slug,
         );
     }
 
@@ -155,3 +179,5 @@ final class ProductMapper
         return new DateTimeImmutable($value->toDateTimeString());
     }
 }
+
+

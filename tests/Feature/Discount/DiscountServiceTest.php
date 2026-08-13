@@ -105,12 +105,45 @@ it('counts active reservations when enforcing the total usage limit', function (
         ->toThrow(RuntimeException::class, 'usage limit');
 });
 
+it('matches category discount targets against every product category and its ancestors', function () {
+    [$service, $root] = discountService();
+    $child = (string) Str::ulid();
+    DB::table('categories')->insert([
+        'id' => $child,
+        'parent_id' => $root,
+        'name' => 'Perfume Oils',
+        'slug' => 'perfume-oils',
+        'is_active' => true,
+        'created_at' => now(),
+        'updated_at' => now(),
+    ]);
+
+    $discountId = insertDiscount(['code' => 'CATEGORY10']);
+    DB::table('discount_code_targets')->insert([
+        'id' => (string) Str::ulid(),
+        'discount_code_id' => $discountId,
+        'target_type' => 'category',
+        'target_id' => $root,
+        'mode' => 'include',
+        'created_at' => now(),
+        'updated_at' => now(),
+    ]);
+
+    $line = discountLine(10000);
+    $line['category_id'] = null;
+    $line['category_ids'] = [$child];
+
+    expect($service->calculate('CATEGORY10', [$line], 0, null, 'guest-category', null, false)['discount_amount'])
+        ->toBe(1000.0);
+});
+
 function discountService(): array
 {
     $root = (string) Str::ulid();
     DB::table('categories')->insert(['id' => $root, 'name' => 'Fragrances', 'slug' => 'fragrances', 'is_active' => true, 'created_at' => now(), 'updated_at' => now()]);
     $context = app(StorefrontContext::class);
     $context->activate('fragrances', [$root]);
+
     return [app(DiscountService::class), $root];
 }
 
@@ -122,6 +155,7 @@ function insertDiscount(array $overrides): string
         'is_active' => true, 'first_order_only' => false, 'applies_to_sale_items' => true,
         'applies_to_all_storefronts' => true, 'created_at' => now(), 'updated_at' => now(),
     ], $overrides));
+
     return $id;
 }
 

@@ -43,11 +43,13 @@ use App\Presentation\Http\Controllers\Newsletter\ResendNewsletterConfirmationCon
 use App\Presentation\Http\Controllers\Newsletter\SubscribeNewsletterController;
 use App\Presentation\Http\Controllers\Newsletter\UnsubscribeNewsletterController;
 use App\Presentation\Http\Controllers\Order\ListMyOrdersController;
+use App\Presentation\Http\Controllers\Order\RestoreFailedOrderToCartController;
 use App\Presentation\Http\Controllers\Payment\InitializePaymentController;
 use App\Presentation\Http\Controllers\Payment\ListPaymentMethodsController;
 use App\Presentation\Http\Controllers\Payment\PaymentWebhookController;
 use App\Presentation\Http\Controllers\Payment\VerifyPaymentController;
 use App\Presentation\Http\Controllers\Shipping\GetShippingOptionsController;
+use App\Presentation\Http\Controllers\Setting\ListSiteSettingsController;
 use App\Presentation\Http\Controllers\Storefront\GetHomepageController;
 use App\Presentation\Http\Controllers\Storefront\GetStorefrontConfigurationController;
 use Illuminate\Http\Request;
@@ -206,6 +208,9 @@ Route::prefix('v1')->middleware('throttle:api')->group(function () {
         Route::get('/', ListMyOrdersController::class);
     });
 
+    Route::post('/orders/{order}/restore-cart', RestoreFailedOrderToCartController::class)
+        ->middleware(['cart.identifier', 'throttle:cart-mutation']);
+
     Route::prefix('shipping')->group(function () {
         Route::post('/getoptions', GetShippingOptionsController::class);
     });
@@ -214,6 +219,7 @@ Route::prefix('v1')->middleware('throttle:api')->group(function () {
     Route::post('/checkout/cart', CheckoutCartController::class)
         ->middleware(['cart.identifier', 'idempotency.required', 'throttle:checkout-payment']);
 
+    Route::get('/settings', ListSiteSettingsController::class)->middleware(['public.cache', 'throttle:catalog']);
     Route::get('/payment-methods', ListPaymentMethodsController::class)->middleware('public.cache');
     Route::post('/payments/initialize', InitializePaymentController::class)
         ->middleware(['idempotency.required', 'throttle:checkout-payment']);

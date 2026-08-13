@@ -47,9 +47,9 @@ use App\Infrastructure\Persistence\Eloquent\Repositories\EloquentSavedItemReposi
 use App\Infrastructure\Persistence\Eloquent\Repositories\EloquentShippingRepository;
 use App\Infrastructure\Persistence\Eloquent\Repositories\EloquentSocialAccountRepository;
 use App\Infrastructure\Persistence\Eloquent\Repositories\EloquentUserRepository;
+use App\Infrastructure\Settings\GoogleCredentialsConfigurator;
 use Illuminate\Database\Eloquent\Relations\Relation;
 use Illuminate\Support\ServiceProvider;
-use RuntimeException;
 use Spatie\MediaLibrary\MediaCollections\Models\Media;
 
 class AppServiceProvider extends ServiceProvider
@@ -129,32 +129,9 @@ class AppServiceProvider extends ServiceProvider
     /**
      * Bootstrap any application services.
      */
-    public function boot(): void
+    public function boot(GoogleCredentialsConfigurator $googleCredentials): void
     {
-        $encoded = env('GOOGLE_APPLICATION_CREDENTIALS_BASE64');
-
-        if ($encoded) {
-            $directory = storage_path('app');
-            $path = $directory.'/google-credentials.json';
-
-            if (! is_dir($directory)) {
-                mkdir($directory, 0755, true);
-            }
-
-            $decoded = base64_decode($encoded, true);
-
-            if ($decoded === false) {
-                throw new RuntimeException('Invalid GOOGLE_APPLICATION_CREDENTIALS_BASE64 value.');
-            }
-
-            if (! file_exists($path)) {
-                file_put_contents($path, $decoded);
-            }
-
-            putenv('GOOGLE_APPLICATION_CREDENTIALS='.$path);
-            $_ENV['GOOGLE_APPLICATION_CREDENTIALS'] = $path;
-            $_SERVER['GOOGLE_APPLICATION_CREDENTIALS'] = $path;
-        }
+        $googleCredentials->apply();
 
         Relation::enforceMorphMap([
             'category' => Category::class,

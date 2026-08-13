@@ -68,6 +68,7 @@ class EloquentOrderRepository implements OrderRepository
             ->with([
                 'items.product' => fn ($query) => $query->withoutGlobalScopes()->with('media'),
                 'items.productVariant.media',
+                'payments.paymentMethod',
             ])
             ->whereKey($id)
             ->first();
@@ -98,6 +99,7 @@ class EloquentOrderRepository implements OrderRepository
             ->with([
                 'items.product' => fn ($query) => $query->withoutGlobalScopes()->with('media'),
                 'items.productVariant.media',
+                'payments.paymentMethod',
             ])
             ->where('order_number', $orderNumber)
             ->first();
@@ -206,6 +208,7 @@ class EloquentOrderRepository implements OrderRepository
             $order->update([
                 'status' => 'cancelled',
                 'cancelled_at' => now(),
+                'inventory_released_at' => now(),
             ]);
 
             if (Schema::hasTable('discount_redemptions')) {
@@ -226,6 +229,7 @@ class EloquentOrderRepository implements OrderRepository
             ->with([
                 'items.product' => fn ($query) => $query->withoutGlobalScopes()->with('media'),
                 'items.productVariant.media',
+                'payments.paymentMethod',
             ])
             ->where('user_id', $userId)
             ->latest()

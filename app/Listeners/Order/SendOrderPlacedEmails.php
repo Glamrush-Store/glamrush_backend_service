@@ -23,8 +23,8 @@ final class SendOrderPlacedEmails implements ShouldQueue
             Mail::to($email, $this->customerName($order))->send(new OrderPlacedMail($order));
         }
 
-        if ($adminEmail = config('mail.admin.address')) {
-            Mail::to($adminEmail, config('mail.admin.name'))->send(new AdminNewOrderMail($order));
+        foreach ($this->adminRecipients() as $email) {
+            Mail::to($email, config('mail.admin.name'))->send(new AdminNewOrderMail($order));
         }
     }
 
@@ -44,5 +44,19 @@ final class SendOrderPlacedEmails implements ShouldQueue
     private function customerName(Order $order): ?string
     {
         return $order->shipping_address['full_name'] ?? $order->user?->name;
+    }
+
+    /** @return list<string> */
+    private function adminRecipients(): array
+    {
+        return collect([
+            config('mail.admin.address'),
+            ...explode(',', (string) config('services.notifications.new_order_emails', '')),
+        ])
+            ->map(fn ($email) => strtolower(trim((string) $email)))
+            ->filter(fn ($email) => filter_var($email, FILTER_VALIDATE_EMAIL))
+            ->unique()
+            ->values()
+            ->all();
     }
 }

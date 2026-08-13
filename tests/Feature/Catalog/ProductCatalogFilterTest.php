@@ -27,7 +27,6 @@ beforeEach(function () {
         $table->timestamp('sale_ends_at')->nullable();
         $table->boolean('is_featured')->default(false);
         $table->integer('sort_order')->default(0);
-        $table->string('category_id')->nullable();
         $table->string('brand_id')->nullable();
         $table->string('vendor_id')->nullable();
         $table->boolean('manage_stock')->default(false);
@@ -73,6 +72,17 @@ beforeEach(function () {
         $table->timestamps();
     });
 
+    Schema::create('category_product', function ($table) {
+        $table->string('id')->primary();
+        $table->string('product_id');
+        $table->string('category_id');
+        $table->boolean('is_primary')->default(false);
+        $table->unsignedInteger('sequence')->default(0);
+        $table->timestamps();
+
+        $table->unique(['product_id', 'category_id']);
+    });
+
     Schema::create('media', function ($table) {
         $table->id();
         $table->morphs('model');
@@ -103,7 +113,7 @@ function catalogFilterProduct(array $overrides = []): string
     $name = $overrides['name'] ?? 'Catalog Product';
     $now = now();
 
-    DB::table('products')->insert(array_merge([
+    $productData = array_merge([
         'id' => $id,
         'name' => $name,
         'slug' => Str::slug($name).'-'.Str::lower(Str::random(6)),
@@ -117,14 +127,28 @@ function catalogFilterProduct(array $overrides = []): string
         'sale_ends_at' => null,
         'is_featured' => false,
         'sort_order' => 0,
-        'category_id' => null,
         'brand_id' => null,
         'manage_stock' => false,
         'stock_quantity' => 0,
         'in_stock' => true,
         'created_at' => $now,
         'updated_at' => $now,
-    ], $overrides));
+    ], $overrides);
+    unset($productData['category_id']);
+    DB::table('products')->insert($productData);
+
+    $categoryId = $overrides['category_id'] ?? null;
+    if ($categoryId) {
+        DB::table('category_product')->insert([
+            'id' => (string) Str::ulid(),
+            'product_id' => $id,
+            'category_id' => $categoryId,
+            'is_primary' => true,
+            'sequence' => (int) ($overrides['sort_order'] ?? 0),
+            'created_at' => $now,
+            'updated_at' => $now,
+        ]);
+    }
 
     DB::table('product_variants')->insert([
         'id' => (string) Str::ulid(),
@@ -330,6 +354,43 @@ it('returns a product detail from inside the storefront category tree', function
         ->assertOk()
         ->assertJsonPath('data.slug', 'midnight-perfume')
         ->assertJsonPath('data.category.slug', 'perfumes');
+});
+
+it('reads multiple categories and the primary category from category_product', function () {
+    $rootId = (string) Str::ulid();
+    $perfumesId = (string) Str::ulid();
+    $oilsId = (string) Str::ulid();
+
+    DB::table('categories')->insert([
+        ['id' => $rootId, 'name' => 'Fragrances', 'slug' => 'fragrances', 'parent_id' => null, 'is_active' => true, 'created_at' => now(), 'updated_at' => now()],
+        ['id' => $perfumesId, 'name' => 'Perfumes', 'slug' => 'perfumes', 'parent_id' => $rootId, 'is_active' => true, 'created_at' => now(), 'updated_at' => now()],
+        ['id' => $oilsId, 'name' => 'Perfume Oils', 'slug' => 'perfume-oils', 'parent_id' => $rootId, 'is_active' => true, 'created_at' => now(), 'updated_at' => now()],
+    ]);
+
+    $productId = catalogFilterProduct([
+        'name' => 'Layered Amber',
+        'slug' => 'layered-amber',
+        'category_id' => $perfumesId,
+    ]);
+
+    DB::table('category_product')->insert([
+        'id' => (string) Str::ulid(),
+        'product_id' => $productId,
+        'category_id' => $oilsId,
+        'is_primary' => false,
+        'sequence' => 1,
+        'created_at' => now(),
+        'updated_at' => now(),
+    ]);
+
+    $response = $this->getJson('/api/v1/products?category=fragrances')
+        ->assertOk()
+        ->assertJsonCount(1, 'data')
+        ->assertJsonPath('data.0.primary_category.slug', 'perfumes')
+        ->assertJsonCount(2, 'data.0.categories');
+
+    expect(collect($response->json('facets.categories'))->pluck('slug')->all())
+        ->toContain('perfumes', 'perfume-oils');
 });
 
 it('searches storefront products case-insensitively using multiple words', function () {

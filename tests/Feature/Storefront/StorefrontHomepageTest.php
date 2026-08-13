@@ -56,10 +56,19 @@ beforeEach(function () {
         $table->boolean('in_stock')->default(true);
         $table->boolean('is_featured')->default(false);
         $table->integer('sort_order')->default(0);
-        $table->string('category_id')->nullable();
         $table->string('brand_id')->nullable();
         $table->string('vendor_id')->nullable();
         $table->timestamps();
+    });
+    Schema::create('category_product', function ($table) {
+        $table->string('id')->primary();
+        $table->string('product_id');
+        $table->string('category_id');
+        $table->boolean('is_primary')->default(false);
+        $table->unsignedInteger('sequence')->default(0);
+        $table->timestamps();
+
+        $table->unique(['product_id', 'category_id']);
     });
     Schema::create('product_variants', function ($table) {
         $table->string('id')->primary();
@@ -164,7 +173,7 @@ function homepageCategory(string $name, string $slug, ?string $parentId = null, 
 function homepageProduct(string $name, string $categoryId, array $overrides = []): string
 {
     $id = (string) Str::ulid();
-    DB::table('products')->insert(array_merge([
+    $productData = array_merge([
         'id' => $id,
         'name' => $name,
         'slug' => Str::slug($name).'-'.Str::lower(Str::random(5)),
@@ -181,12 +190,23 @@ function homepageProduct(string $name, string $categoryId, array $overrides = []
         'in_stock' => true,
         'is_featured' => false,
         'sort_order' => 0,
-        'category_id' => $categoryId,
         'brand_id' => null,
         'vendor_id' => null,
         'created_at' => now(),
         'updated_at' => now(),
-    ], $overrides));
+    ], $overrides);
+    unset($productData['category_id']);
+    DB::table('products')->insert($productData);
+
+    DB::table('category_product')->insert([
+        'id' => (string) Str::ulid(),
+        'product_id' => $id,
+        'category_id' => $overrides['category_id'] ?? $categoryId,
+        'is_primary' => true,
+        'sequence' => (int) ($overrides['sort_order'] ?? 0),
+        'created_at' => now(),
+        'updated_at' => now(),
+    ]);
 
     return $id;
 }

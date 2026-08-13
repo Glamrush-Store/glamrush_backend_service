@@ -41,6 +41,7 @@ class Order extends Model
         'placed_at',
         'paid_at',
         'inventory_committed_at',
+        'inventory_released_at',
         'expires_at',
         'cancelled_at',
     ];
@@ -60,6 +61,7 @@ class Order extends Model
             'placed_at' => 'datetime',
             'paid_at' => 'datetime',
             'inventory_committed_at' => 'datetime',
+            'inventory_released_at' => 'datetime',
             'expires_at' => 'datetime',
             'cancelled_at' => 'datetime',
         ];
@@ -73,6 +75,11 @@ class Order extends Model
     public function items(): HasMany
     {
         return $this->hasMany(OrderItem::class, 'order_id');
+    }
+
+    public function payments(): HasMany
+    {
+        return $this->hasMany(Payment::class, 'order_id');
     }
 
     public function shippingRate(): BelongsTo
