@@ -55,4 +55,9 @@ return [
         'base_url' => env('FLUTTERWAVE_BASE_URL', 'https://api.flutterwave.com/v3'),
     ],
 
+    'notifications' => [
+        'new_order_emails' => env('NEW_ORDER_EMAILS', ''),
+        'payment_failed_emails' => env('PAYMENT_FAILED_EMAILS', ''),
+    ],
+
 ];

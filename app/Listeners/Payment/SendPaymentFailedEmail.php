@@ -3,13 +3,19 @@
 namespace App\Listeners\Payment;
 
 use App\Domain\Payment\Events\PaymentFailed;
+use App\Domain\Setting\Services\NotificationRecipientResolver;
 use App\Infrastructure\Persistence\Eloquent\Models\Payment;
+use App\Mail\Orders\AdminPaymentFailedMail;
 use App\Mail\Orders\PaymentFailedMail;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Support\Facades\Mail;
 
 final class SendPaymentFailedEmail implements ShouldQueue
 {
+    public function __construct(
+        private readonly NotificationRecipientResolver $recipients,
+    ) {}
+
     public function handle(PaymentFailed $event): void
     {
         $payment = Payment::query()
@@ -29,19 +35,11 @@ final class SendPaymentFailedEmail implements ShouldQueue
                 ->send(new PaymentFailedMail($order, $payment));
         }
 
-        foreach ($this->adminRecipients() as $recipient) {
-            Mail::to($recipient, config('mail.admin.name'))->send(new PaymentFailedMail($order, $payment));
+        foreach ($this->recipients->resolve(
+            'PAYMENT_FAILED_EMAILS',
+            'services.notifications.payment_failed_emails',
+        ) as $recipient) {
+            Mail::to($recipient, config('mail.admin.name'))->send(new AdminPaymentFailedMail($order, $payment));
         }
-    }
-
-    /** @return list<string> */
-    private function adminRecipients(): array
-    {
-        return collect(explode(',', (string) config('services.notifications.payment_failed_emails', '')))
-            ->map(fn ($email) => strtolower(trim((string) $email)))
-            ->filter(fn ($email) => filter_var($email, FILTER_VALIDATE_EMAIL))
-            ->unique()
-            ->values()
-            ->all();
     }
 }

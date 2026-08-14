@@ -17,6 +17,7 @@ use App\Domain\User\Contracts\AddressRepository;
 use App\Domain\User\Contracts\SocialAccountRepository;
 use App\Domain\User\Contracts\UserRepository;
 use App\Infrastructure\Caching\CacheInvalidationObserver;
+use App\Infrastructure\CacheMetrics\RegisterCacheMetricsListeners;
 use App\Infrastructure\Persistence\Eloquent\Models\AttributeType;
 use App\Infrastructure\Persistence\Eloquent\Models\Brand;
 use App\Infrastructure\Persistence\Eloquent\Models\Category;
@@ -132,6 +133,7 @@ class AppServiceProvider extends ServiceProvider
     public function boot(GoogleCredentialsConfigurator $googleCredentials): void
     {
         $googleCredentials->apply();
+        app(RegisterCacheMetricsListeners::class)->register();
 
         Relation::enforceMorphMap([
             'category' => Category::class,
@@ -165,3 +167,4 @@ class AppServiceProvider extends ServiceProvider
 
     }
 }
+
