@@ -22,6 +22,10 @@ class ProductResource extends JsonResource
             'slug' => $this->slug,
             'sku' => $this->sku,
             'type' => $this->type,
+            'shortDescription' => $this->shortDescription,
+            'description' => $this->description,
+            'metaTitle' => $this->metaTitle,
+            'metaDescription' => $this->metaDescription,
             'isOnSale' => $this->isOnSale($now),
             'price' => $this->originalPrice(),
             'salePrice' => $this->currentSalePrice($now),
@@ -86,5 +90,3 @@ class ProductResource extends JsonResource
         ];
     }
 }
-
-

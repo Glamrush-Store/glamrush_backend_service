@@ -348,12 +348,16 @@ it('returns a product detail from inside the storefront category tree', function
         'name' => 'Midnight Perfume',
         'slug' => 'midnight-perfume',
         'category_id' => $childId,
+        'short_description' => 'Warm amber and soft woods.',
+        'description' => 'A deep evening fragrance with amber, spice, and a lingering woody finish.',
     ]);
 
     $this->getJson('/api/v1/storefronts/fragrances/products/midnight-perfume')
         ->assertOk()
         ->assertJsonPath('data.slug', 'midnight-perfume')
-        ->assertJsonPath('data.category.slug', 'perfumes');
+        ->assertJsonPath('data.category.slug', 'perfumes')
+        ->assertJsonPath('data.shortDescription', 'Warm amber and soft woods.')
+        ->assertJsonPath('data.description', 'A deep evening fragrance with amber, spice, and a lingering woody finish.');
 });
 
 it('reads multiple categories and the primary category from category_product', function () {
