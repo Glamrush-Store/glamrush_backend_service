@@ -3,6 +3,7 @@
 namespace App\Listeners\Order;
 
 use App\Domain\Order\Events\OrderPlaced;
+use App\Domain\Setting\Services\NotificationRecipientResolver;
 use App\Infrastructure\Persistence\Eloquent\Models\Order;
 use App\Mail\Orders\AdminNewOrderMail;
 use App\Mail\Orders\OrderPlacedMail;
@@ -11,6 +12,10 @@ use Illuminate\Support\Facades\Mail;
 
 final class SendOrderPlacedEmails implements ShouldQueue
 {
+    public function __construct(
+        private readonly NotificationRecipientResolver $recipients,
+    ) {}
+
     public function handle(OrderPlaced $event): void
     {
         $order = $this->order($event->orderId);
@@ -23,7 +28,11 @@ final class SendOrderPlacedEmails implements ShouldQueue
             Mail::to($email, $this->customerName($order))->send(new OrderPlacedMail($order));
         }
 
-        foreach ($this->adminRecipients() as $email) {
+        foreach ($this->recipients->resolve(
+            'NEW_ORDER_EMAILS',
+            'services.notifications.new_order_emails',
+            [config('mail.admin.address')],
+        ) as $email) {
             Mail::to($email, config('mail.admin.name'))->send(new AdminNewOrderMail($order));
         }
     }
@@ -44,19 +53,5 @@ final class SendOrderPlacedEmails implements ShouldQueue
     private function customerName(Order $order): ?string
     {
         return $order->shipping_address['full_name'] ?? $order->user?->name;
-    }
-
-    /** @return list<string> */
-    private function adminRecipients(): array
-    {
-        return collect([
-            config('mail.admin.address'),
-            ...explode(',', (string) config('services.notifications.new_order_emails', '')),
-        ])
-            ->map(fn ($email) => strtolower(trim((string) $email)))
-            ->filter(fn ($email) => filter_var($email, FILTER_VALIDATE_EMAIL))
-            ->unique()
-            ->values()
-            ->all();
     }
 }

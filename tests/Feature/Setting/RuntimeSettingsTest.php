@@ -1,5 +1,6 @@
 <?php
 
+use App\Domain\Setting\Services\NotificationRecipientResolver;
 use App\Domain\Setting\Services\RuntimeSettingService;
 use App\Infrastructure\Persistence\Eloquent\Models\Setting;
 use App\Infrastructure\Persistence\Eloquent\Models\SettingCategory;
@@ -62,6 +63,24 @@ it('uses private settings internally without exposing them through the public se
         ->assertOk()
         ->assertJsonPath('data.PAYSTACK_PUBLIC_KEY', 'public-key')
         ->assertJsonMissing(['PAYSTACK_SECRET_KEY' => 'private-secret']);
+});
+
+it('resolves valid unique admin notification recipients from comma-separated settings', function () {
+    $category = runtimeSettingCategory('ORDER NOTIFICATION MAILS', 'order-notification-mails');
+    runtimeSetting($category, 'NEW_ORDER_EMAILS', 'string', ' Orders@Example.com, finance@example.com, invalid, orders@example.com ');
+    runtimeSetting($category, 'PAYMENT_FAILED_EMAILS', 'string', 'payments@example.com, support@example.com');
+
+    $resolver = new NotificationRecipientResolver(new RuntimeSettingService);
+
+    expect($resolver->resolve(
+        'NEW_ORDER_EMAILS',
+        'services.notifications.new_order_emails',
+        ['owner@example.com'],
+    ))->toBe(['owner@example.com', 'orders@example.com', 'finance@example.com'])
+        ->and($resolver->resolve(
+            'PAYMENT_FAILED_EMAILS',
+            'services.notifications.payment_failed_emails',
+        ))->toBe(['payments@example.com', 'support@example.com']);
 });
 
 function runtimeSettingCategory(string $name, string $slug): SettingCategory
