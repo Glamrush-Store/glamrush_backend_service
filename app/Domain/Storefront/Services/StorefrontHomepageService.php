@@ -15,8 +15,10 @@ use App\Infrastructure\Persistence\Eloquent\Models\StorefrontCampaign;
 use App\Infrastructure\Persistence\Eloquent\Models\StorefrontHomepageSection;
 use App\Presentation\Http\Resources\Catalog\CategoryResource;
 use App\Presentation\Http\Resources\Catalog\ProductResource;
+use App\Support\Media\SafeMediaUrl;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Throwable;
 
@@ -39,7 +41,7 @@ final class StorefrontHomepageService
     public function get(string $storefront): array
     {
         $ttl = max(0, (int) config('storefront.homepage.cache_ttl', 300));
-        $key = "storefront:{$storefront}:homepage:v2";
+        $key = "storefront:{$storefront}:homepage:v4";
 
         if ($ttl === 0) {
             return $this->build($storefront);
@@ -59,7 +61,13 @@ final class StorefrontHomepageService
             ->where('slug', $storefront)
             ->whereNull('parent_id')
             ->where('is_active', true)
-            ->firstOrFail(['id', 'name', 'slug']);
+            ->firstOrFail([
+                'id',
+                'name',
+                'slug',
+                'announcement_primary_text',
+                'announcement_secondary_text',
+            ]);
 
         $campaign = StorefrontCampaign::query()
             ->forStorefront($storefront)
@@ -78,6 +86,10 @@ final class StorefrontHomepageService
             'storefront' => [
                 'slug' => $root->slug,
                 'name' => $root->name,
+                'announcement' => [
+                    'primary_text' => $root->announcement_primary_text,
+                    'secondary_text' => $root->announcement_secondary_text,
+                ],
             ],
             'campaign' => $this->campaignData($campaign),
             'sections' => $sections
@@ -94,13 +106,16 @@ final class StorefrontHomepageService
             return null;
         }
 
+        $desktopImage = $campaign->getFirstMedia('desktop-image');
+        $mobileImage = $campaign->getFirstMedia('mobile-image');
+
         return [
             'id' => $campaign->id,
             'eyebrow' => $campaign->eyebrow,
             'title' => $campaign->title,
             'description' => $campaign->description,
-            'desktop_image' => $campaign->getFirstMediaUrl('desktop-image') ?: null,
-            'mobile_image' => $campaign->getFirstMediaUrl('mobile-image') ?: null,
+            'desktop_image' => $desktopImage ? SafeMediaUrl::get($desktopImage) : '',
+            'mobile_image' => $mobileImage ? SafeMediaUrl::get($mobileImage) : '',
             'cta_label' => $campaign->cta_label,
             'cta_url' => $campaign->cta_url,
             'starts_at' => $campaign->starts_at?->toISOString(),
@@ -198,7 +213,8 @@ final class StorefrontHomepageService
             return [];
         }
 
-        $query = $this->productQuery()->whereIn('products.category_id', $this->descendantIds($category->id));
+        $query = $this->productQuery()
+            ->whereHas('categories', fn (Builder $categoryQuery) => $categoryQuery->whereIn('categories.id', $this->descendantIds($category->id)));
         $this->applySafeSort($query, $config);
 
         return $this->productData($query->limit($this->productLimit($config))->get());
@@ -263,11 +279,12 @@ final class StorefrontHomepageService
             ->where('parent_id', $root->id)
             ->values();
 
-        $productCounts = Product::query()
-            ->whereIn('category_id', $this->storefrontContext->categoryIds())
-            ->selectRaw('category_id, COUNT(*) as aggregate')
-            ->groupBy('category_id')
-            ->pluck('aggregate', 'category_id');
+        $productCounts = DB::table('category_product')
+            ->join('products', 'products.id', '=', 'category_product.product_id')
+            ->whereIn('category_product.category_id', $this->storefrontContext->categoryIds())
+            ->selectRaw('category_product.category_id, COUNT(DISTINCT products.id) as aggregate')
+            ->groupBy('category_product.category_id')
+            ->pluck('aggregate', 'category_product.category_id');
 
         $items = $categories->map(function (Category $category) use ($productCounts): array {
             $count = collect($this->descendantIds($category->id))
@@ -289,10 +306,11 @@ final class StorefrontHomepageService
     {
         return Product::query()
             ->select('products.*')
-            ->whereIn('products.category_id', $this->storefrontContext->categoryIds())
+            ->whereHas('categories', fn (Builder $categoryQuery) => $categoryQuery->whereIn('categories.id', $this->storefrontContext->categoryIds()))
             ->with([
                 'media',
-                'category:id,name,slug',
+                'categories:id,name,slug',
+                'primaryCategory:id,name,slug',
                 'brand:id,name,slug',
                 'variants',
                 'variants.media',

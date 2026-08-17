@@ -22,6 +22,10 @@ class ProductResource extends JsonResource
             'slug' => $this->slug,
             'sku' => $this->sku,
             'type' => $this->type,
+            'shortDescription' => $this->shortDescription,
+            'description' => $this->description,
+            'metaTitle' => $this->metaTitle,
+            'metaDescription' => $this->metaDescription,
             'isOnSale' => $this->isOnSale($now),
             'price' => $this->originalPrice(),
             'salePrice' => $this->currentSalePrice($now),
@@ -40,6 +44,20 @@ class ProductResource extends JsonResource
                     'slug' => $this->category->slug,
                 ]
                 : null,
+
+            'primary_category' => $this->category
+                ? [
+                    'id' => $this->category->id,
+                    'name' => $this->category->name,
+                    'slug' => $this->category->slug,
+                ]
+                : null,
+
+            'categories' => array_map(fn ($category) => [
+                'id' => $category->id,
+                'name' => $category->name,
+                'slug' => $category->slug,
+            ], $this->categories),
 
             'brand' => $this->brand
                 ? [

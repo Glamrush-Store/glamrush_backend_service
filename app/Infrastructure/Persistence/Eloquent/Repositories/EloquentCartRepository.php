@@ -20,7 +20,7 @@ use Illuminate\Support\Facades\DB;
 
 final class EloquentCartRepository implements CartRepository
 {
-    private const ITEM_RELATIONS = ['product', 'product.media', 'variant', 'variant.media'];
+    private const ITEM_RELATIONS = ['product', 'product.media', 'product.categories', 'product.primaryCategory', 'variant', 'variant.media'];
 
     private const CART_TTL_DAYS = 7;
 
@@ -183,10 +183,13 @@ final class EloquentCartRepository implements CartRepository
     /** @return array{Product, ProductVariant} */
     private function resolveSelection(string $productId, ?string $productVariantId): array
     {
-        $product = Product::query()->find($productId);
+        $product = Product::query()
+            ->with(['categories', 'primaryCategory'])
+            ->when($this->storefrontContext->isActive(), fn (Builder $query) => $query
+                ->whereHas('categories', fn (Builder $categoryQuery) => $categoryQuery->whereIn('categories.id', $this->storefrontContext->categoryIds())))
+            ->find($productId);
 
-        if (! $product || ($this->storefrontContext->isActive()
-            && ! in_array($product->category_id, $this->storefrontContext->categoryIds(), true))) {
+        if (! $product) {
             throw (new ModelNotFoundException)->setModel(Product::class, [$productId]);
         }
 
@@ -301,7 +304,7 @@ final class EloquentCartRepository implements CartRepository
 
         $query->whereHas('product', fn (Builder $productQuery) => $productQuery
             ->withoutGlobalScopes()
-            ->whereIn('category_id', $this->storefrontContext->categoryIds()));
+            ->whereHas('categories', fn (Builder $categoryQuery) => $categoryQuery->whereIn('categories.id', $this->storefrontContext->categoryIds())));
     }
 
     private function freshExpiry(): \Illuminate\Support\Carbon
@@ -309,3 +312,4 @@ final class EloquentCartRepository implements CartRepository
         return now()->addDays(self::CART_TTL_DAYS);
     }
 }
+

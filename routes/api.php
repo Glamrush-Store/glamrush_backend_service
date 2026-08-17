@@ -25,24 +25,33 @@ use App\Presentation\Http\Controllers\Catalog\SyncSavedItemsController;
 use App\Presentation\Http\Controllers\Catalog\UpdateCartItemByIdController;
 use App\Presentation\Http\Controllers\Catalog\UpdateCartItemController;
 use App\Presentation\Http\Controllers\Checkout\CheckoutCartController;
-use App\Presentation\Http\Controllers\Discount\ValidateDiscountController;
+use App\Presentation\Http\Controllers\Contact\StoreContactSubmissionController;
+use App\Presentation\Http\Controllers\Content\ListPublicFaqsController;
+use App\Presentation\Http\Controllers\Content\ShowPublicContentPageController;
 use App\Presentation\Http\Controllers\Customer\DeleteAddressController;
 use App\Presentation\Http\Controllers\Customer\ListAddressesController;
 use App\Presentation\Http\Controllers\Customer\SetDefaultAddressController;
 use App\Presentation\Http\Controllers\Customer\ShowAddressController;
 use App\Presentation\Http\Controllers\Customer\StoreAddressController;
 use App\Presentation\Http\Controllers\Customer\UpdateAddressController;
+use App\Presentation\Http\Controllers\Discount\ValidateDiscountController;
+use App\Presentation\Http\Controllers\Location\ListCountriesController;
+use App\Presentation\Http\Controllers\Location\ListCountryStatesController;
+use App\Presentation\Http\Controllers\Location\ListStateCitiesController;
 use App\Presentation\Http\Controllers\Newsletter\ConfirmNewsletterSubscriptionController;
 use App\Presentation\Http\Controllers\Newsletter\ResendNewsletterConfirmationController;
 use App\Presentation\Http\Controllers\Newsletter\SubscribeNewsletterController;
 use App\Presentation\Http\Controllers\Newsletter\UnsubscribeNewsletterController;
 use App\Presentation\Http\Controllers\Order\ListMyOrdersController;
+use App\Presentation\Http\Controllers\Order\RestoreFailedOrderToCartController;
 use App\Presentation\Http\Controllers\Payment\InitializePaymentController;
 use App\Presentation\Http\Controllers\Payment\ListPaymentMethodsController;
 use App\Presentation\Http\Controllers\Payment\PaymentWebhookController;
 use App\Presentation\Http\Controllers\Payment\VerifyPaymentController;
 use App\Presentation\Http\Controllers\Shipping\GetShippingOptionsController;
+use App\Presentation\Http\Controllers\Setting\ListSiteSettingsController;
 use App\Presentation\Http\Controllers\Storefront\GetHomepageController;
+use App\Presentation\Http\Controllers\Storefront\GetStorefrontConfigurationController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
@@ -55,6 +64,12 @@ Route::get('/user', function (Request $request) {
 // ========================================================
 
 Route::prefix('v1')->middleware('throttle:api')->group(function () {
+    Route::prefix('locations')->middleware(['public.cache', 'throttle:catalog'])->group(function () {
+        Route::get('/countries', ListCountriesController::class);
+        Route::get('/countries/{country}/states', ListCountryStatesController::class);
+        Route::get('/countries/{country}/states/{state}/cities', ListStateCitiesController::class);
+    });
+
     Route::prefix('newsletter/subscriptions')->group(function () {
         Route::post('/', SubscribeNewsletterController::class)->middleware('throttle:newsletter-subscribe');
         Route::get('/confirm/{token}', ConfirmNewsletterSubscriptionController::class)
@@ -79,6 +94,15 @@ Route::prefix('v1')->middleware('throttle:api')->group(function () {
                 Route::get('/products/{slug}', GetProductController::class);
                 Route::get('/collections/{collection}/products', ListProductController::class);
             });
+
+            Route::get('/configuration', GetStorefrontConfigurationController::class)
+                ->middleware('throttle:catalog');
+
+            Route::get('/pages/{slug}', ShowPublicContentPageController::class)
+                ->where('slug', '[a-z0-9]+(?:-[a-z0-9]+)*');
+            Route::get('/faqs', ListPublicFaqsController::class);
+            Route::post('/contact-submissions', StoreContactSubmissionController::class)
+                ->middleware('throttle:contact-submission');
 
             Route::prefix('cart')->group(function () {
                 Route::post('/', AddToCartController::class)->middleware('throttle:cart-mutation');
@@ -184,6 +208,9 @@ Route::prefix('v1')->middleware('throttle:api')->group(function () {
         Route::get('/', ListMyOrdersController::class);
     });
 
+    Route::post('/orders/{order}/restore-cart', RestoreFailedOrderToCartController::class)
+        ->middleware(['cart.identifier', 'throttle:cart-mutation']);
+
     Route::prefix('shipping')->group(function () {
         Route::post('/getoptions', GetShippingOptionsController::class);
     });
@@ -192,6 +219,7 @@ Route::prefix('v1')->middleware('throttle:api')->group(function () {
     Route::post('/checkout/cart', CheckoutCartController::class)
         ->middleware(['cart.identifier', 'idempotency.required', 'throttle:checkout-payment']);
 
+    Route::get('/settings', ListSiteSettingsController::class)->middleware(['public.cache', 'throttle:catalog']);
     Route::get('/payment-methods', ListPaymentMethodsController::class)->middleware('public.cache');
     Route::post('/payments/initialize', InitializePaymentController::class)
         ->middleware(['idempotency.required', 'throttle:checkout-payment']);
@@ -202,3 +230,10 @@ Route::prefix('v1')->middleware('throttle:api')->group(function () {
 });
 
 Route::get('/test', fn () => 'test worked');
+
+// ========================================================
+// Liveliness Test Route
+// ========================================================
+Route::prefix('v1')->group(function () {
+    Route::get('/up', fn () => response()->json(['status' => 'ok']));
+});

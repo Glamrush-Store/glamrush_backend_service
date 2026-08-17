@@ -6,6 +6,7 @@ use App\Domain\Catalog\Cart\CartIdentifier;
 use App\Domain\Catalog\Cart\Exceptions\InsufficientStockException;
 use App\Domain\Catalog\Storefront\StorefrontContext;
 use App\Domain\Discount\Services\DiscountService;
+use App\Domain\Location\Services\LocationService;
 use App\Domain\Order\Actions\GenerateOrderNumberAction;
 use App\Domain\Order\Contracts\CheckoutRepository;
 use App\Domain\Order\Entities\CheckoutResult;
@@ -17,8 +18,10 @@ use App\Infrastructure\Persistence\Eloquent\Models\Order;
 use App\Infrastructure\Persistence\Eloquent\Models\ProductVariant;
 use App\Infrastructure\Persistence\Eloquent\Models\ShippingRate;
 use App\Infrastructure\Persistence\Eloquent\Models\ShippingZone;
+use App\Support\Media\SafeMediaUrl;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 use RuntimeException;
 
 final class EloquentCheckoutRepository implements CheckoutRepository
@@ -28,6 +31,7 @@ final class EloquentCheckoutRepository implements CheckoutRepository
         private readonly StorefrontContext $storefrontContext,
         private readonly OutboxService $outbox,
         private readonly DiscountService $discounts,
+        private readonly LocationService $locations,
     ) {}
 
     public function createPendingOrderFromCart(
@@ -119,8 +123,11 @@ final class EloquentCheckoutRepository implements CheckoutRepository
                     'unit_price' => $unitPrice,
                     'line_total' => $lineTotal,
                     'category_id' => (string) $product->category_id,
+                    'category_ids' => $product->categories->pluck('id')->map(fn ($id) => (string) $id)->all(),
                     'brand_id' => $product->brand_id ? (string) $product->brand_id : null,
-                    'collection_ids' => $product->collections->pluck('id')->map(fn ($id) => (string) $id)->all(),
+                    'collection_ids' => Schema::hasTable('collections') && $product->relationLoaded('collections')
+                        ? $product->collections->pluck('id')->map(fn ($id) => (string) $id)->all()
+                        : [],
                     'is_on_sale' => $this->variantIsOnSale($variant),
                 ];
             }
@@ -141,6 +148,7 @@ final class EloquentCheckoutRepository implements CheckoutRepository
                         'product_id' => (string) $item['product']->id,
                         'variant_id' => (string) $item['variant']->id,
                         'category_id' => $item['category_id'],
+                        'category_ids' => $item['category_ids'],
                         'brand_id' => $item['brand_id'],
                         'collection_ids' => $item['collection_ids'],
                         'quantity' => $item['quantity'],
@@ -235,7 +243,7 @@ final class EloquentCheckoutRepository implements CheckoutRepository
     {
         return CartItem::query()
             ->with([
-                'product' => fn ($query) => $query->withoutGlobalScopes()->with(['media', 'collections']),
+                'product' => fn ($query) => $query->withoutGlobalScopes()->with($this->productCheckoutRelations()),
                 'product.defaultVariant.media',
                 'variant.media',
             ])
@@ -243,9 +251,20 @@ final class EloquentCheckoutRepository implements CheckoutRepository
             ->when($this->storefrontContext->isActive(), function (Builder $query) {
                 $query->whereHas('product', fn (Builder $productQuery) => $productQuery
                     ->withoutGlobalScopes()
-                    ->whereIn('category_id', $this->storefrontContext->categoryIds()));
+                    ->whereHas('categories', fn (Builder $categoryQuery) => $categoryQuery->whereIn('categories.id', $this->storefrontContext->categoryIds())));
             })
             ->get();
+    }
+
+    private function productCheckoutRelations(): array
+    {
+        $relations = ['media', 'categories', 'primaryCategory'];
+
+        if (Schema::hasTable('collections') && Schema::hasTable('collection_product')) {
+            $relations[] = 'collections';
+        }
+
+        return $relations;
     }
 
     private function constrainCart(Builder $query, CartIdentifier $cartIdentifier): void
@@ -295,20 +314,23 @@ final class EloquentCheckoutRepository implements CheckoutRepository
 
     private function findBestZoneForAddress(ShippingAddressEntity $address): ?ShippingZone
     {
+        $countries = $this->locations->countryIdentifiers($address->country);
+        $states = $this->locations->stateIdentifiers($address->country, $address->state);
+
         return ShippingZone::query()
             ->where('is_active', true)
-            ->where('country', $address->country)
-            ->where(function ($query) use ($address) {
+            ->whereIn('country', $countries)
+            ->where(function ($query) use ($address, $states) {
                 if ($address->state && $address->city) {
-                    $query->orWhere(function ($q) use ($address) {
-                        $q->where('state', $address->state)
+                    $query->orWhere(function ($q) use ($address, $states) {
+                        $q->whereIn('state', $states)
                             ->where('city', $address->city);
                     });
                 }
 
                 if ($address->state) {
-                    $query->orWhere(function ($q) use ($address) {
-                        $q->where('state', $address->state)
+                    $query->orWhere(function ($q) use ($states) {
+                        $q->whereIn('state', $states)
                             ->whereNull('city');
                     });
                 }
@@ -318,21 +340,7 @@ final class EloquentCheckoutRepository implements CheckoutRepository
                         ->whereNull('city');
                 });
             })
-            ->orderByRaw(
-                '
-                CASE
-                    WHEN state = ? AND city = ? THEN 1
-                    WHEN state = ? AND city IS NULL THEN 2
-                    WHEN state IS NULL AND city IS NULL THEN 3
-                    ELSE 4
-                END
-                ',
-                [
-                    $address->state,
-                    $address->city,
-                    $address->state,
-                ]
-            )
+            ->orderByRaw('CASE WHEN city = ? THEN 1 WHEN state IS NOT NULL THEN 2 ELSE 3 END', [$address->city])
             ->first();
     }
 
@@ -367,13 +375,7 @@ final class EloquentCheckoutRepository implements CheckoutRepository
     private function orderItemImages(ProductVariant $variant, $product): array
     {
         $variantImages = $variant->getMedia('catalog-photos')
-            ->map(fn ($media) => [
-                'id' => $media->id,
-                'name' => $media->name,
-                'url' => $media->getUrl(),
-                'thumb' => $media->getUrl('thumb'),
-                'medium' => $media->getUrl('medium'),
-            ])
+            ->map(fn ($media) => SafeMediaUrl::image($media))
             ->all();
 
         if ($variantImages !== []) {
@@ -381,13 +383,7 @@ final class EloquentCheckoutRepository implements CheckoutRepository
         }
 
         return $product->getMedia('catalog-photos')
-            ->map(fn ($media) => [
-                'id' => $media->id,
-                'name' => $media->name,
-                'url' => $media->getUrl(),
-                'thumb' => $media->getUrl('thumb'),
-                'medium' => $media->getUrl('medium'),
-            ])
+            ->map(fn ($media) => SafeMediaUrl::image($media))
             ->all();
     }
 }

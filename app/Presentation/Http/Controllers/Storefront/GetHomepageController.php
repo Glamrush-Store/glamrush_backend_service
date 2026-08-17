@@ -11,8 +11,7 @@ final class GetHomepageController
 {
     public function __construct(
         private readonly StorefrontHomepageService $homepage,
-    ) {
-    }
+    ) {}
 
     #[OA\Get(
         path: '/api/v1/storefronts/{storefront}/homepage',
@@ -37,7 +36,14 @@ final class GetHomepageController
                         'success' => true,
                         'message' => 'Success',
                         'data' => [
-                            'storefront' => ['slug' => 'fragrances', 'name' => 'Fragrances'],
+                            'storefront' => [
+                                'slug' => 'fragrances',
+                                'name' => 'Fragrances',
+                                'announcement' => [
+                                    'primary_text' => 'Free Lagos delivery on orders over ₦100,000',
+                                    'secondary_text' => 'Complimentary scent consultation',
+                                ],
+                            ],
                             'campaign' => [
                                 'id' => '01K1ABCDEF1234567890ABCDEF',
                                 'eyebrow' => 'After-dark fragrances',
@@ -58,7 +64,7 @@ final class GetHomepageController
                                     'subtitle' => null,
                                     'display_order' => 1,
                                     'items' => [],
-                                ]
+                                ],
                             ],
                         ],
                     ],

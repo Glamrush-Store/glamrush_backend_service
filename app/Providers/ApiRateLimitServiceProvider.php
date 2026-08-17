@@ -131,6 +131,11 @@ final class ApiRateLimitServiceProvider extends ServiceProvider
             config('api_rate_limits.newsletter_action_per_minute'),
             'ip:'.ApiRateLimitKey::ip($request),
         ));
+
+        RateLimiter::for('contact-submission', fn (Request $request): Limit => $this->perMinute(
+            config('api_rate_limits.contact_submissions_per_minute'),
+            'storefront-ip:'.hash('sha256', (string) $request->route('storefront').'|'.ApiRateLimitKey::ip($request)),
+        ));
     }
 
     private function perMinute(mixed $attempts, string $key): Limit

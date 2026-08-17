@@ -3,6 +3,7 @@
 namespace App\Listeners\Order;
 
 use App\Domain\Order\Events\OrderPlaced;
+use App\Domain\Setting\Services\NotificationRecipientResolver;
 use App\Infrastructure\Persistence\Eloquent\Models\Order;
 use App\Mail\Orders\AdminNewOrderMail;
 use App\Mail\Orders\OrderPlacedMail;
@@ -11,6 +12,10 @@ use Illuminate\Support\Facades\Mail;
 
 final class SendOrderPlacedEmails implements ShouldQueue
 {
+    public function __construct(
+        private readonly NotificationRecipientResolver $recipients,
+    ) {}
+
     public function handle(OrderPlaced $event): void
     {
         $order = $this->order($event->orderId);
@@ -23,8 +28,12 @@ final class SendOrderPlacedEmails implements ShouldQueue
             Mail::to($email, $this->customerName($order))->send(new OrderPlacedMail($order));
         }
 
-        if ($adminEmail = config('mail.admin.address')) {
-            Mail::to($adminEmail, config('mail.admin.name'))->send(new AdminNewOrderMail($order));
+        foreach ($this->recipients->resolve(
+            'NEW_ORDER_EMAILS',
+            'services.notifications.new_order_emails',
+            [config('mail.admin.address')],
+        ) as $email) {
+            Mail::to($email, config('mail.admin.name'))->send(new AdminNewOrderMail($order));
         }
     }
 

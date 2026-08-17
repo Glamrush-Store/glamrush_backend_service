@@ -1,10 +1,10 @@
 <?php
+
 /*
  * © 2026 Demilade Oyewusi
  * Licensed under the MIT License.
  * See the LICENSE file for details.
  */
-
 
 namespace App\Infrastructure\Persistence\Eloquent\Mappers\Catalog;
 
@@ -13,6 +13,7 @@ use App\Domain\Catalog\Category\Entities\CategoryEntity;
 use App\Domain\Catalog\Product\Entities\ProductEntity;
 use App\Domain\Catalog\Product\Entities\ProductVariantEntity;
 use App\Infrastructure\Persistence\Eloquent\Models\Product;
+use App\Support\Media\SafeMediaUrl;
 use DateTimeImmutable;
 
 final class ProductMapper
@@ -25,41 +26,40 @@ final class ProductMapper
             slug: $model->slug,
             sku: self::mapSku($model),
             type: $model->type,
-            isFeatured: (bool)$model->is_featured,
-            sortOrder: (int)$model->sort_order,
+            isFeatured: (bool) $model->is_featured,
+            sortOrder: (int) $model->sort_order,
             vendor: self::mapVendor($model),
             category: self::mapCategory($model),
+            categories: self::mapCategories($model),
             brand: self::mapBrand($model),
-            images: $model->getMedia('catalog-photos')->map(function ($media) {
-                return [
-                    'id' => $media->id,
-                    'name' => $media->name,
-                    'url' => $media->getUrl(),
-                    'thumb' => $media->getUrl('thumb'),
-                    'medium' => $media->getUrl('medium'),
-                ];
-            })->all(),
-            price: (float)$model->price,
+            images: $model->getMedia('catalog-photos')
+                ->map(fn ($media) => SafeMediaUrl::image($media))
+                ->all(),
+            price: (float) $model->price,
             salePrice: $model->sale_price !== null
-                ? (float)$model->sale_price
+                ? (float) $model->sale_price
                 : null,
             saleStartsAt: $model->sale_starts_at,
             saleEndsAt: $model->sale_ends_at,
-            manageStock: (bool)$model->manage_stock,
-            stockQuantity: (int)$model->stock_quantity,
-            inStock: (bool)$model->in_stock,
-            variants: self::mapVariants($model)
+            manageStock: (bool) $model->manage_stock,
+            stockQuantity: (int) $model->stock_quantity,
+            inStock: (bool) $model->in_stock,
+            variants: self::mapVariants($model),
+            shortDescription: $model->short_description,
+            description: $model->description,
+            metaTitle: $model->meta_title,
+            metaDescription: $model->meta_description,
         );
     }
 
     private static function mapVendor($model): ?BrandEntity
     {
-        if (!$model->relationLoaded('vendor') || !$model->vendor) {
+        if (! $model->relationLoaded('vendor') || ! $model->vendor) {
             return null;
         }
 
         return new BrandEntity(
-            id: (string)$model->vendor->id,
+            id: (string) $model->vendor->id,
             name: $model->vendor->name,
             slug: $model->vendor->slug,
         );
@@ -71,7 +71,7 @@ final class ProductMapper
             return $model->sku;
         }
 
-        if ($model->type !== 'simple' || !$model->relationLoaded('variants')) {
+        if ($model->type !== 'simple' || ! $model->relationLoaded('variants')) {
             return null;
         }
 
@@ -83,25 +83,48 @@ final class ProductMapper
 
     private static function mapCategory($model): ?CategoryEntity
     {
-        if (!$model->relationLoaded('category') || !$model->category) {
-            return null;
+        if ($model->relationLoaded('primaryCategory') && $model->primaryCategory->isNotEmpty()) {
+            return self::categoryEntity($model->primaryCategory->first());
         }
 
+        if ($model->relationLoaded('categories') && $model->categories->isNotEmpty()) {
+            $primary = $model->categories->first(fn ($category) => (bool) ($category->pivot?->is_primary));
+
+            return self::categoryEntity($primary ?? $model->categories->first());
+        }
+
+        return null;
+    }
+
+    /** @return CategoryEntity[] */
+    private static function mapCategories($model): array
+    {
+        if (! $model->relationLoaded('categories')) {
+            return [];
+        }
+
+        return $model->categories
+            ->map(fn ($category) => self::categoryEntity($category))
+            ->all();
+    }
+
+    private static function categoryEntity($category): CategoryEntity
+    {
         return new CategoryEntity(
-            id: (string)$model->category->id,
-            name: $model->category->name,
-            slug: $model->category->slug,
+            id: (string) $category->id,
+            name: $category->name,
+            slug: $category->slug,
         );
     }
 
     private static function mapBrand($model): ?BrandEntity
     {
-        if (!$model->relationLoaded('brand') || !$model->brand) {
+        if (! $model->relationLoaded('brand') || ! $model->brand) {
             return null;
         }
 
         return new BrandEntity(
-            id: (string)$model->brand->id,
+            id: (string) $model->brand->id,
             name: $model->brand->name,
             slug: $model->brand->slug,
         );
@@ -112,35 +135,29 @@ final class ProductMapper
      */
     private static function mapVariants(Product $model): array
     {
-        if (!$model->relationLoaded('variants')) {
+        if (! $model->relationLoaded('variants')) {
             return [];
         }
 
         return $model->variants->map(
-            fn($variant) => new ProductVariantEntity(
-                id: (string)$variant->id,
+            fn ($variant) => new ProductVariantEntity(
+                id: (string) $variant->id,
                 sku: $variant->sku,
-                images: $variant->getMedia('catalog-photos')->map(function ($media) {
-                    return [
-                        'id' => $media->id,
-                        'name' => $media->name,
-                        'url' => $media->getUrl(),
-                        'thumb' => $media->getUrl('thumb'),
-                        'medium' => $media->getUrl('medium'),
-                    ];
-                })->all(),
-                isDefault: (bool)$variant->is_default,
-                price: (float)$variant->price,
+                images: $variant->getMedia('catalog-photos')
+                    ->map(fn ($media) => SafeMediaUrl::image($media))
+                    ->all(),
+                isDefault: (bool) $variant->is_default,
+                price: (float) $variant->price,
                 salePrice: $variant->sale_price !== null
-                    ? (float)$variant->sale_price
+                    ? (float) $variant->sale_price
                     : null,
                 saleStartsAt: self::toDateTime($variant->sale_starts_at),
                 saleEndsAt: self::toDateTime($variant->sale_ends_at),
-                manageStock: (bool)$variant->manage_stock,
-                stockQuantity: (int)$variant->stock_quantity,
-                inStock: (bool)$variant->in_stock,
+                manageStock: (bool) $variant->manage_stock,
+                stockQuantity: (int) $variant->stock_quantity,
+                inStock: (bool) $variant->in_stock,
                 attributes: $variant->attributes ?? [],
-                sortOrder: (int)$variant->sort_order,
+                sortOrder: (int) $variant->sort_order,
                 status: $variant->status,
 
             )
@@ -149,9 +166,10 @@ final class ProductMapper
 
     private static function toDateTime($value): ?DateTimeImmutable
     {
-        if (!$value) {
+        if (! $value) {
             return null;
         }
+
         return new DateTimeImmutable($value->toDateTimeString());
     }
 }

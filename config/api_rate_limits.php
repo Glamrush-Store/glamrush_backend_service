@@ -17,4 +17,5 @@ return [
     'newsletter_subscribe_per_hour_per_email' => (int) env('API_RATE_LIMIT_NEWSLETTER_EMAIL_PER_HOUR', 3),
     'newsletter_subscribe_per_hour_per_ip' => (int) env('API_RATE_LIMIT_NEWSLETTER_IP_PER_HOUR', 10),
     'newsletter_action_per_minute' => (int) env('API_RATE_LIMIT_NEWSLETTER_ACTION_PER_MINUTE', 10),
+    'contact_submissions_per_minute' => (int) env('API_RATE_LIMIT_CONTACT_SUBMISSIONS_PER_MINUTE', 5),
 ];

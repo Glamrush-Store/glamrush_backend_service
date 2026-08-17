@@ -35,6 +35,11 @@ final class ProductEntity
         public int $stockQuantity,
         private bool $inStock,
         private array $variants = [],
+        public readonly array $categories = [],
+        public readonly ?string $shortDescription = null,
+        public readonly ?string $description = null,
+        public readonly ?string $metaTitle = null,
+        public readonly ?string $metaDescription = null,
     ) {}
 
     /* ------------------------------------------

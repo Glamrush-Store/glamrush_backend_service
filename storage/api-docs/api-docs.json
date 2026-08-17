@@ -12,6 +12,186 @@
         }
     ],
     "paths": {
+        "/api/v1/storefronts/{storefront}/pages/{slug}": {
+            "get": {
+                "tags": [
+                    "Public Content"
+                ],
+                "summary": "Get a published storefront page",
+                "operationId": "674d830941507f1b68f3dc2fb16be80e",
+                "parameters": [
+                    {
+                        "name": "storefront",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "example": "fragrances"
+                        }
+                    },
+                    {
+                        "name": "slug",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "example": "about"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Published page"
+                    },
+                    "404": {
+                        "description": "Storefront or page unavailable"
+                    }
+                }
+            }
+        },
+        "/api/v1/storefronts/{storefront}/faqs": {
+            "get": {
+                "tags": [
+                    "Public Content"
+                ],
+                "summary": "List published storefront FAQs",
+                "operationId": "1d58a84a2ece61f6b26629d6c428c284",
+                "parameters": [
+                    {
+                        "name": "storefront",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "example": "fragrances"
+                        }
+                    },
+                    {
+                        "name": "category",
+                        "in": "query",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "search",
+                        "in": "query",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "page",
+                        "in": "query",
+                        "schema": {
+                            "type": "integer",
+                            "minimum": 1
+                        }
+                    },
+                    {
+                        "name": "per_page",
+                        "in": "query",
+                        "schema": {
+                            "type": "integer",
+                            "maximum": 50,
+                            "minimum": 1
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Grouped FAQ results"
+                    },
+                    "404": {
+                        "description": "Storefront unavailable"
+                    },
+                    "422": {
+                        "description": "Invalid filter"
+                    }
+                }
+            }
+        },
+        "/api/v1/storefronts/{storefront}/contact-submissions": {
+            "post": {
+                "tags": [
+                    "Contact"
+                ],
+                "summary": "Submit a public contact message",
+                "operationId": "2559c00f8be76b102e8e9f661a10496a",
+                "parameters": [
+                    {
+                        "name": "storefront",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "example": "fragrances"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "required": [
+                                    "name",
+                                    "email",
+                                    "message"
+                                ],
+                                "properties": {
+                                    "name": {
+                                        "type": "string",
+                                        "maxLength": 150
+                                    },
+                                    "email": {
+                                        "type": "string",
+                                        "format": "email"
+                                    },
+                                    "phone": {
+                                        "type": "string",
+                                        "nullable": true
+                                    },
+                                    "subject": {
+                                        "type": "string",
+                                        "nullable": true
+                                    },
+                                    "message": {
+                                        "type": "string",
+                                        "maxLength": 5000,
+                                        "minLength": 10
+                                    },
+                                    "source": {
+                                        "type": "string",
+                                        "example": "contact-page",
+                                        "nullable": true
+                                    },
+                                    "website": {
+                                        "description": "Honeypot; leave empty",
+                                        "type": "string"
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "202": {
+                        "description": "Message accepted; response contains only a reference"
+                    },
+                    "404": {
+                        "description": "Storefront unavailable"
+                    },
+                    "422": {
+                        "description": "Invalid message"
+                    },
+                    "429": {
+                        "description": "Rate limit exceeded"
+                    }
+                }
+            }
+        },
         "/api/v1/storefronts/{storefront}/homepage": {
             "get": {
                 "tags": [
@@ -43,7 +223,11 @@
                                     "data": {
                                         "storefront": {
                                             "slug": "fragrances",
-                                            "name": "Fragrances"
+                                            "name": "Fragrances",
+                                            "announcement": {
+                                                "primary_text": "Free Lagos delivery on orders over ₦100,000",
+                                                "secondary_text": "Complimentary scent consultation"
+                                            }
                                         },
                                         "campaign": {
                                             "id": "01K1ABCDEF1234567890ABCDEF",
@@ -74,6 +258,49 @@
                     },
                     "404": {
                         "description": "Unknown, inactive, or non-root storefront"
+                    }
+                }
+            }
+        },
+        "/api/v1/storefronts/{storefront}/configuration": {
+            "get": {
+                "tags": [
+                    "Storefront"
+                ],
+                "summary": "Get public storefront-wide presentation settings",
+                "operationId": "getStorefrontConfiguration",
+                "parameters": [
+                    {
+                        "name": "storefront",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "example": "fragrances"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Public storefront presentation settings.",
+                        "content": {
+                            "application/json": {
+                                "schema": {},
+                                "example": {
+                                    "success": true,
+                                    "message": "Success",
+                                    "data": {
+                                        "announcement": {
+                                            "primary_text": "Free Lagos delivery on orders over ₦100,000",
+                                            "secondary_text": "Complimentary scent consultation"
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Unknown or inactive storefront."
                     }
                 }
             }
@@ -245,6 +472,14 @@
         }
     },
     "tags": [
+        {
+            "name": "Public Content",
+            "description": "Public Content"
+        },
+        {
+            "name": "Contact",
+            "description": "Contact"
+        },
         {
             "name": "Storefront",
             "description": "Storefront"

@@ -2466,6 +2466,68 @@
             ]
         },
         {
+            "name": "Public Content & Contact",
+            "description": "Read-only public content from admin-owned shared tables. Content is not cached. Contact submissions are backend-owned and rate-limited.",
+            "item": [
+                {
+                    "name": "Get Published Page",
+                    "request": {
+                        "method": "GET",
+                        "header": [{ "key": "Accept", "value": "application/json" }],
+                        "url": {
+                            "raw": "{{baseUrl}}/storefronts/{{storefrontSlug}}/pages/about",
+                            "host": ["{{baseUrl}}"],
+                            "path": ["storefronts", "{{storefrontSlug}}", "pages", "about"]
+                        },
+                        "description": "Returns only a currently published global or storefront-assigned page. Draft, scheduled, expired, deleted, and cross-storefront pages return the same 404."
+                    },
+                    "response": []
+                },
+                {
+                    "name": "List Published FAQs",
+                    "request": {
+                        "method": "GET",
+                        "header": [{ "key": "Accept", "value": "application/json" }],
+                        "url": {
+                            "raw": "{{baseUrl}}/storefronts/{{storefrontSlug}}/faqs?search=delivery&per_page=20",
+                            "host": ["{{baseUrl}}"],
+                            "path": ["storefronts", "{{storefrontSlug}}", "faqs"],
+                            "query": [
+                                { "key": "category", "value": "shipping", "disabled": true },
+                                { "key": "search", "value": "delivery" },
+                                { "key": "page", "value": "1", "disabled": true },
+                                { "key": "per_page", "value": "20" }
+                            ]
+                        },
+                        "description": "Returns published FAQs grouped by active category with deterministic ordering. per_page is capped at 50."
+                    },
+                    "response": []
+                },
+                {
+                    "name": "Submit Contact Message",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            { "key": "Content-Type", "value": "application/json" },
+                            { "key": "Accept", "value": "application/json" }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n    \"name\": \"Jane Doe\",\n    \"email\": \"jane@example.com\",\n    \"phone\": \"+2348000000000\",\n    \"subject\": \"Question about my delivery\",\n    \"message\": \"Please confirm when my order will arrive.\",\n    \"source\": \"contact-page\",\n    \"website\": \"\"\n}",
+                            "options": { "raw": { "language": "json" } }
+                        },
+                        "url": {
+                            "raw": "{{baseUrl}}/storefronts/{{storefrontSlug}}/contact-submissions",
+                            "host": ["{{baseUrl}}"],
+                            "path": ["storefronts", "{{storefrontSlug}}", "contact-submissions"]
+                        },
+                        "description": "Public endpoint, optionally associated through a Sanctum session. Returns HTTP 202 with only a reference. Limited to five requests per minute per IP/storefront."
+                    },
+                    "response": []
+                }
+            ]
+        },
+        {
             "name": "Checkout",
             "description": "Checkout requires Idempotency-Key. Reuse the same key only when retrying an identical request; a different payload with the same key returns 422.",
             "item": [

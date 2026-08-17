@@ -8,6 +8,7 @@ use App\Infrastructure\Caching\QueryCache;
 use App\Infrastructure\Persistence\Eloquent\Models\Category;
 use Closure;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Schema;
 use Symfony\Component\HttpFoundation\Response;
 
 final class ResolveStorefrontCategory
@@ -47,6 +48,7 @@ final class ResolveStorefrontCategory
         $root = Category::query()
             ->where('slug', $slug)
             ->whereNull('parent_id')
+            ->when(Schema::hasColumn('categories', 'deleted_at'), fn ($query) => $query->whereNull('deleted_at'))
             ->where('is_active', true)
             ->with('childrenRecursive')
             ->first();
@@ -65,7 +67,7 @@ final class ResolveStorefrontCategory
     private function collectActiveDescendantIds(Category $category, array &$categoryIds): void
     {
         foreach ($category->childrenRecursive as $child) {
-            if (! $child->is_active) {
+            if (! $child->is_active || $child->deleted_at !== null) {
                 continue;
             }
 
