@@ -6,6 +6,7 @@ use App\Domain\Catalog\Cart\Entities\CartItemEntity;
 use App\Infrastructure\Persistence\Eloquent\Models\CartItem;
 use App\Infrastructure\Persistence\Eloquent\Models\Product;
 use App\Infrastructure\Persistence\Eloquent\Models\ProductVariant;
+use App\Support\Media\SafeMediaUrl;
 
 final class CartItemMapper
 {
@@ -13,8 +14,17 @@ final class CartItemMapper
     {
         $product = $model->product;
         $variant = $model->variant;
-        $thumb = $variant?->getFirstMediaUrl('catalog-photos', 'thumb') ?: null;
-        $thumb ??= $product->getFirstMediaUrl('catalog-photos', 'thumb') ?: null;
+        $variantMedia = $variant?->getFirstMedia('catalog-photos');
+        $productMedia = $product->getFirstMedia('catalog-photos');
+        $thumb = $variantMedia ? SafeMediaUrl::get($variantMedia, 'thumb') : '';
+
+        if ($thumb === '' && $productMedia) {
+            $thumb = SafeMediaUrl::get($productMedia, 'thumb');
+        }
+
+        if (! $variantMedia && ! $productMedia) {
+            $thumb = null;
+        }
 
         return new CartItemEntity(
             id: $model->id,

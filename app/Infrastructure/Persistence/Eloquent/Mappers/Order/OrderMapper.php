@@ -6,6 +6,7 @@ use App\Domain\Order\Entities\OrderEntity;
 use App\Domain\Order\Entities\OrderItemEntity;
 use App\Infrastructure\Persistence\Eloquent\Models\Order;
 use App\Infrastructure\Persistence\Eloquent\Models\OrderItem;
+use App\Support\Media\SafeMediaUrl;
 use DateTimeImmutable;
 use Illuminate\Database\Eloquent\Model;
 
@@ -14,7 +15,7 @@ final class OrderMapper
     public static function toDomain(Order $model): OrderEntity
     {
         $items = $model->relationLoaded('items')
-            ? $model->items->map(fn(OrderItem $item) => self::itemToDomain($item))->all()
+            ? $model->items->map(fn (OrderItem $item) => self::itemToDomain($item))->all()
             : null;
 
         $paymentMethodCode = null;
@@ -29,24 +30,24 @@ final class OrderMapper
         }
 
         return new OrderEntity(
-            id: (string)$model->id,
-            userId: $model->user_id !== null ? (string)$model->user_id : null,
+            id: (string) $model->id,
+            userId: $model->user_id !== null ? (string) $model->user_id : null,
             guestId: $model->guest_id,
             orderNumber: $model->order_number,
             status: $model->status->value,
             paymentMethodCode: $paymentMethodCode,
             discountCode: $model->discount_code,
-            subtotal: (string)$model->subtotal,
-            discountAmount: (string)($model->discount_amount ?? 0),
-            shippingAmount: (string)$model->shipping_amount,
-            shippingDiscountAmount: (string)($model->shipping_discount_amount ?? 0),
-            total: (string)$model->total,
+            subtotal: (string) $model->subtotal,
+            discountAmount: (string) ($model->discount_amount ?? 0),
+            shippingAmount: (string) $model->shipping_amount,
+            shippingDiscountAmount: (string) ($model->shipping_discount_amount ?? 0),
+            total: (string) $model->total,
             currency: $model->currency,
             shippingRateId: $model->shipping_rate_id,
             shippingMethodName: $model->shipping_method_name,
             shippingZoneName: $model->shipping_zone_name,
-            shippingAddress: (array)$model->shipping_address,
-            billingAddress: $model->billing_address !== null ? (array)$model->billing_address : null,
+            shippingAddress: (array) $model->shipping_address,
+            billingAddress: $model->billing_address !== null ? (array) $model->billing_address : null,
             placedAt: $model->placed_at !== null
                 ? DateTimeImmutable::createFromInterface($model->placed_at)
                 : null,
@@ -66,18 +67,18 @@ final class OrderMapper
     public static function itemToDomain(OrderItem $model): OrderItemEntity
     {
         return new OrderItemEntity(
-            id: (string)$model->id,
-            orderId: (string)$model->order_id,
-            productId: (string)$model->product_id,
+            id: (string) $model->id,
+            orderId: (string) $model->order_id,
+            productId: (string) $model->product_id,
             productVariantId: $model->product_variant_id,
             productName: $model->product_name,
             productSlug: $model->product_slug,
             sku: $model->sku,
-            unitPrice: (string)$model->unit_price,
-            quantity: (int)$model->quantity,
-            lineSubtotal: (string)($model->line_subtotal ?? $model->line_total),
-            discountAmount: (string)($model->discount_amount ?? 0),
-            lineTotal: (string)$model->line_total,
+            unitPrice: (string) $model->unit_price,
+            quantity: (int) $model->quantity,
+            lineSubtotal: (string) ($model->line_subtotal ?? $model->line_total),
+            discountAmount: (string) ($model->discount_amount ?? 0),
+            lineTotal: (string) $model->line_total,
             productSnapshot: self::snapshotWithImages($model),
         );
     }
@@ -90,7 +91,7 @@ final class OrderMapper
             return null;
         }
 
-        if (!empty($snapshot['images'])) {
+        if (! empty($snapshot['images'])) {
             return $snapshot;
         }
 
@@ -109,18 +110,12 @@ final class OrderMapper
 
     private static function mediaImages(?Model $model): array
     {
-        if ($model === null || !method_exists($model, 'getMedia')) {
+        if ($model === null || ! method_exists($model, 'getMedia')) {
             return [];
         }
 
         return $model->getMedia('catalog-photos')
-            ->map(fn($media) => [
-                'id' => $media->id,
-                'name' => $media->name,
-                'url' => $media->getUrl(),
-                'thumb' => $media->getUrl('thumb'),
-                'medium' => $media->getUrl('medium'),
-            ])
+            ->map(fn ($media) => SafeMediaUrl::image($media))
             ->all();
     }
 }

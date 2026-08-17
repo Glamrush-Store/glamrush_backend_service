@@ -16,6 +16,8 @@ it('overrides environment-backed configuration with active typed settings', func
         'api_rate_limits.general_per_minute' => 120,
         'services.paystack.secret_key' => 'environment-secret',
         'filesystems.disks.gcs.use_key_file' => true,
+        'filesystems.disks.r2.secret' => 'environment-r2-secret',
+        'filesystems.disks.r2.use_path_style_endpoint' => false,
     ]);
 
     $rateLimits = runtimeSettingCategory('API_RATE_LIMITING', 'api-rate-limiting');
@@ -25,13 +27,17 @@ it('overrides environment-backed configuration with active typed settings', func
     runtimeSetting($rateLimits, 'API_RATE_LIMIT_GENERAL_PER_MINUTE', 'integer', 45);
     runtimeSetting($payments, 'PAYSTACK_SECRET_KEY', 'string', 'database-secret');
     runtimeSetting($media, 'USE_GCP_KEY_FILE', 'boolean', false);
+    runtimeSetting($media, 'R2_SECRET_ACCESS_KEY', 'string', 'database-r2-secret');
+    runtimeSetting($media, 'R2_USE_PATH_STYLE_ENDPOINT', 'boolean', true);
 
     $settings = new RuntimeSettingService;
     $settings->applyToConfiguration();
 
     expect(config('api_rate_limits.general_per_minute'))->toBe(45)
         ->and(config('services.paystack.secret_key'))->toBe('database-secret')
-        ->and(config('filesystems.disks.gcs.use_key_file'))->toBeFalse();
+        ->and(config('filesystems.disks.gcs.use_key_file'))->toBeFalse()
+        ->and(config('filesystems.disks.r2.secret'))->toBe('database-r2-secret')
+        ->and(config('filesystems.disks.r2.use_path_style_endpoint'))->toBeTrue();
 });
 
 it('falls back to environment configuration when a setting is missing or removed', function () {

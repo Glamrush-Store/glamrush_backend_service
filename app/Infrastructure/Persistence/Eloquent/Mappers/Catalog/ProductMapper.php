@@ -13,6 +13,7 @@ use App\Domain\Catalog\Category\Entities\CategoryEntity;
 use App\Domain\Catalog\Product\Entities\ProductEntity;
 use App\Domain\Catalog\Product\Entities\ProductVariantEntity;
 use App\Infrastructure\Persistence\Eloquent\Models\Product;
+use App\Support\Media\SafeMediaUrl;
 use DateTimeImmutable;
 
 final class ProductMapper
@@ -31,15 +32,9 @@ final class ProductMapper
             category: self::mapCategory($model),
             categories: self::mapCategories($model),
             brand: self::mapBrand($model),
-            images: $model->getMedia('catalog-photos')->map(function ($media) {
-                return [
-                    'id' => $media->id,
-                    'name' => $media->name,
-                    'url' => $media->getUrl(),
-                    'thumb' => $media->getUrl('thumb'),
-                    'medium' => $media->getUrl('medium'),
-                ];
-            })->all(),
+            images: $model->getMedia('catalog-photos')
+                ->map(fn ($media) => SafeMediaUrl::image($media))
+                ->all(),
             price: (float) $model->price,
             salePrice: $model->sale_price !== null
                 ? (float) $model->sale_price
@@ -148,15 +143,9 @@ final class ProductMapper
             fn ($variant) => new ProductVariantEntity(
                 id: (string) $variant->id,
                 sku: $variant->sku,
-                images: $variant->getMedia('catalog-photos')->map(function ($media) {
-                    return [
-                        'id' => $media->id,
-                        'name' => $media->name,
-                        'url' => $media->getUrl(),
-                        'thumb' => $media->getUrl('thumb'),
-                        'medium' => $media->getUrl('medium'),
-                    ];
-                })->all(),
+                images: $variant->getMedia('catalog-photos')
+                    ->map(fn ($media) => SafeMediaUrl::image($media))
+                    ->all(),
                 isDefault: (bool) $variant->is_default,
                 price: (float) $variant->price,
                 salePrice: $variant->sale_price !== null
