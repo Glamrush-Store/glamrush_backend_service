@@ -3,6 +3,7 @@
 namespace App\Presentation\Http\Resources\Content;
 
 use App\Domain\Content\Enums\ContentPageType;
+use App\Support\Media\SafeMediaUrl;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 use Illuminate\Support\Arr;
@@ -25,7 +26,7 @@ final class PublicContentPageResource extends JsonResource
             'media' => $this->whenLoaded('media', fn () => $this->media->map(fn ($media) => [
                 'id' => $media->id,
                 'name' => $media->name,
-                'url' => $media->getUrl(),
+                'url' => SafeMediaUrl::get($media),
             ])->values()->all()),
             'published_at' => $this->published_at?->toISOString(),
             'updated_at' => $this->updated_at?->toISOString(),

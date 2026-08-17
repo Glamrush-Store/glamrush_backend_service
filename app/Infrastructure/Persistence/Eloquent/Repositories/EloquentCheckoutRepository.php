@@ -18,6 +18,7 @@ use App\Infrastructure\Persistence\Eloquent\Models\Order;
 use App\Infrastructure\Persistence\Eloquent\Models\ProductVariant;
 use App\Infrastructure\Persistence\Eloquent\Models\ShippingRate;
 use App\Infrastructure\Persistence\Eloquent\Models\ShippingZone;
+use App\Support\Media\SafeMediaUrl;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
@@ -374,13 +375,7 @@ final class EloquentCheckoutRepository implements CheckoutRepository
     private function orderItemImages(ProductVariant $variant, $product): array
     {
         $variantImages = $variant->getMedia('catalog-photos')
-            ->map(fn ($media) => [
-                'id' => $media->id,
-                'name' => $media->name,
-                'url' => $media->getUrl(),
-                'thumb' => $media->getUrl('thumb'),
-                'medium' => $media->getUrl('medium'),
-            ])
+            ->map(fn ($media) => SafeMediaUrl::image($media))
             ->all();
 
         if ($variantImages !== []) {
@@ -388,15 +383,7 @@ final class EloquentCheckoutRepository implements CheckoutRepository
         }
 
         return $product->getMedia('catalog-photos')
-            ->map(fn ($media) => [
-                'id' => $media->id,
-                'name' => $media->name,
-                'url' => $media->getUrl(),
-                'thumb' => $media->getUrl('thumb'),
-                'medium' => $media->getUrl('medium'),
-            ])
+            ->map(fn ($media) => SafeMediaUrl::image($media))
             ->all();
     }
 }
-
-

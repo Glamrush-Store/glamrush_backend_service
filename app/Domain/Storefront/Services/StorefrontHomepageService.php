@@ -15,6 +15,7 @@ use App\Infrastructure\Persistence\Eloquent\Models\StorefrontCampaign;
 use App\Infrastructure\Persistence\Eloquent\Models\StorefrontHomepageSection;
 use App\Presentation\Http\Resources\Catalog\CategoryResource;
 use App\Presentation\Http\Resources\Catalog\ProductResource;
+use App\Support\Media\SafeMediaUrl;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
@@ -105,13 +106,16 @@ final class StorefrontHomepageService
             return null;
         }
 
+        $desktopImage = $campaign->getFirstMedia('desktop-image');
+        $mobileImage = $campaign->getFirstMedia('mobile-image');
+
         return [
             'id' => $campaign->id,
             'eyebrow' => $campaign->eyebrow,
             'title' => $campaign->title,
             'description' => $campaign->description,
-            'desktop_image' => $campaign->getFirstMediaUrl('desktop-image') ?: null,
-            'mobile_image' => $campaign->getFirstMediaUrl('mobile-image') ?: null,
+            'desktop_image' => $desktopImage ? SafeMediaUrl::get($desktopImage) : '',
+            'mobile_image' => $mobileImage ? SafeMediaUrl::get($mobileImage) : '',
             'cta_label' => $campaign->cta_label,
             'cta_url' => $campaign->cta_url,
             'starts_at' => $campaign->starts_at?->toISOString(),
@@ -424,5 +428,3 @@ final class StorefrontHomepageService
         return $slug;
     }
 }
-
-
