@@ -194,6 +194,56 @@ it('filters catalog products currently on sale', function () {
         ->assertJsonPath('data.0.isOnSale', true);
 });
 
+it('returns price facet bounds from the lowest to highest displayed product price', function () {
+    catalogFilterProduct([
+        'name' => 'Lowest Active Sale',
+        'price' => 12000,
+        'sale_price' => 7000,
+        'sale_starts_at' => now()->subDay(),
+        'sale_ends_at' => now()->addDay(),
+    ]);
+
+    $variableProductId = catalogFilterProduct([
+        'name' => 'Variable Product',
+        'type' => 'variable',
+        'price' => 99999,
+    ]);
+
+    DB::table('product_variants')
+        ->where('product_id', $variableProductId)
+        ->where('is_default', true)
+        ->update(['price' => 25000]);
+
+    DB::table('product_variants')->insert([
+        'id' => (string) Str::ulid(),
+        'product_id' => $variableProductId,
+        'sku' => 'NON-DEFAULT-LOW',
+        'is_default' => false,
+        'price' => 100,
+        'sale_price' => null,
+        'sale_starts_at' => null,
+        'sale_ends_at' => null,
+        'manage_stock' => false,
+        'stock_quantity' => 0,
+        'in_stock' => true,
+        'attributes' => json_encode([]),
+        'sort_order' => 1,
+        'status' => 'published',
+        'created_at' => now(),
+        'updated_at' => now(),
+    ]);
+
+    catalogFilterProduct([
+        'name' => 'Highest Regular Price',
+        'price' => 30000,
+    ]);
+
+    $this->getJson('/api/v1/products')
+        ->assertOk()
+        ->assertJsonPath('facets.price_range.min', 7000)
+        ->assertJsonPath('facets.price_range.max', 30000);
+});
+
 it('filters catalog products not currently on sale', function () {
     catalogFilterProduct([
         'name' => 'Active Sale',
