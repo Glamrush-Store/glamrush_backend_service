@@ -301,14 +301,58 @@ final class EloquentProductRepository implements ProductRepository
             return ['min' => 0.0, 'max' => 0.0];
         }
 
-        $result = ProductVariant::whereIn('product_id', $productIds)
-            ->selectRaw('MIN(price) as min_price, MAX(price) as max_price')
+        $now = now();
+        $priceExpression = $this->effectiveCatalogPriceExpression();
+        $priceBindings = [$now, $now, $now, $now];
+
+        $result = DB::table('products')
+            ->leftJoin('product_variants as default_price_variant', function ($join) {
+                $join->on('default_price_variant.product_id', '=', 'products.id')
+                    ->where('default_price_variant.is_default', true);
+            })
+            ->whereIn('products.id', $productIds)
+            ->selectRaw(
+                "MIN({$priceExpression}) as min_price, MAX({$priceExpression}) as max_price",
+                [...$priceBindings, ...$priceBindings],
+            )
             ->first();
 
         return [
             'min' => (float) ($result->min_price ?? 0),
             'max' => (float) ($result->max_price ?? 0),
         ];
+    }
+
+    private function effectiveCatalogPriceExpression(): string
+    {
+        return <<<'SQL'
+            CASE
+                WHEN products.type = 'variable' THEN
+                    CASE
+                        WHEN default_price_variant.sale_price IS NOT NULL
+                            AND default_price_variant.sale_price > 0
+                            AND default_price_variant.sale_price < default_price_variant.price
+                            AND default_price_variant.sale_starts_at IS NOT NULL
+                            AND default_price_variant.sale_starts_at <= ?
+                            AND default_price_variant.sale_ends_at IS NOT NULL
+                            AND default_price_variant.sale_ends_at >= ?
+                        THEN default_price_variant.sale_price
+                        ELSE default_price_variant.price
+                    END
+                ELSE
+                    CASE
+                        WHEN products.sale_price IS NOT NULL
+                            AND products.sale_price > 0
+                            AND products.sale_price < products.price
+                            AND products.sale_starts_at IS NOT NULL
+                            AND products.sale_starts_at <= ?
+                            AND products.sale_ends_at IS NOT NULL
+                            AND products.sale_ends_at >= ?
+                        THEN products.sale_price
+                        ELSE products.price
+                    END
+            END
+            SQL;
     }
 
     private function getBrandFacets(ListProductsQuery $query): array
@@ -452,7 +496,3 @@ final class EloquentProductRepository implements ProductRepository
         return $facets;
     }
 }
-
-
-
-
