@@ -41,7 +41,7 @@ final class StorefrontHomepageService
     public function get(string $storefront): array
     {
         $ttl = max(0, (int) config('storefront.homepage.cache_ttl', 300));
-        $key = "storefront:{$storefront}:homepage:v4";
+        $key = "storefront:{$storefront}:homepage:v7";
 
         if ($ttl === 0) {
             return $this->build($storefront);
@@ -296,10 +296,15 @@ final class StorefrontHomepageService
         });
 
         if (filter_var($config['require_products'] ?? false, FILTER_VALIDATE_BOOL)) {
-            $items = $items->where('product_count', '>', 0);
+            $items = $items
+                ->where('product_count', '>', 0)
+                ->shuffle()
+                ->concat($items->where('product_count', '<=', 0)->shuffle());
+        } else {
+            $items = $items->shuffle();
         }
 
-        return $items->shuffle()->take($this->limit($config))->values()->all();
+        return $items->take($this->categoryLimit($config))->values()->all();
     }
 
     private function productQuery(): Builder
@@ -417,6 +422,15 @@ final class StorefrontHomepageService
         $maximum = max(1, (int) config('storefront.homepage.max_product_limit', 4));
 
         return min($this->limit($config), $maximum);
+    }
+
+    private function categoryLimit(array $config): int
+    {
+        $default = max(1, (int) config('storefront.homepage.default_category_limit', 6));
+        $maximum = max(1, (int) config('storefront.homepage.max_category_limit', 6));
+        $value = filter_var($config['limit'] ?? $default, FILTER_VALIDATE_INT);
+
+        return min(max($value === false ? $default : $value, $default), $maximum);
     }
 
     private function safeSlug(mixed $slug): ?string
