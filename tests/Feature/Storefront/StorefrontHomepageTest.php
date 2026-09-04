@@ -425,17 +425,19 @@ it('returns only valid available sales with simple and default variant prices', 
 
 it('returns cached stable random categories with product counts and storefront isolation', function () {
     $fragrances = DB::table('categories')->where('slug', 'fragrances')->value('id');
-    foreach (['Oils', 'Sprays', 'Mists', 'Candles'] as $name) {
+    foreach (['Oils', 'Sprays', 'Mists', 'Candles', 'Diffusers', 'Incense'] as $index => $name) {
         $category = homepageCategory($name, Str::slug($name), $fragrances);
-        homepageProduct("{$name} Product", $category);
+        if ($index < 4) {
+            homepageProduct("{$name} Product", $category);
+        }
     }
-    homepageSection('random_categories', ['limit' => 99, 'require_products' => true]);
+    homepageSection('random_categories', ['limit' => 4, 'require_products' => true]);
 
     $first = $this->getJson('/api/v1/storefronts/fragrances/homepage')->assertOk()->json('data.sections.0.items');
     DB::table('storefront_homepage_sections')->where('storefront_slug', 'fragrances')->delete();
     $second = $this->getJson('/api/v1/storefronts/fragrances/homepage')->assertOk()->json('data.sections.0.items');
-    expect($second)->toBe($first)->and($first)->toHaveCount(3);
-    expect($first[0]['product_count'])->toBe(1);
+    expect($second)->toBe($first)->and($first)->toHaveCount(6);
+    expect(array_column($first, 'product_count'))->toBe([1, 1, 1, 1, 0, 0]);
 
     homepageCategory('Beauty', 'beauty');
     $this->getJson('/api/v1/storefronts/beauty/homepage')->assertOk()->assertJsonCount(0, 'data.sections');
