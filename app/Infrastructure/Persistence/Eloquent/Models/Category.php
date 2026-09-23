@@ -18,6 +18,7 @@ class Category extends Model implements HasMedia
 
     protected $casts = [
         'is_active' => 'boolean',
+        'sort_order' => 'integer',
         'deleted_at' => 'datetime',
     ];
 
@@ -52,7 +53,9 @@ class Category extends Model implements HasMedia
 
     public function children()
     {
-        return $this->hasMany(Category::class, 'parent_id');
+        return $this->hasMany(Category::class, 'parent_id')
+            ->orderBy('sort_order')
+            ->orderBy('id');
     }
 
     public function products(): BelongsToMany
@@ -64,4 +67,3 @@ class Category extends Model implements HasMedia
             ->orderByPivot('sequence');
     }
 }
-
