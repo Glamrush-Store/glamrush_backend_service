@@ -69,6 +69,7 @@ beforeEach(function () {
         $table->string('slug')->unique();
         $table->string('parent_id')->nullable();
         $table->boolean('is_active')->default(true);
+        $table->integer('sort_order')->default(0);
         $table->timestamps();
     });
 
@@ -332,6 +333,65 @@ it('scopes a storefront catalog to its active root category tree', function () {
         ->assertJsonPath('data.0.slug', 'hair')
         ->assertJsonCount(1, 'data.0.children')
         ->assertJsonPath('data.0.children.0.slug', 'wigs');
+});
+
+it('orders storefront category children by sort order', function () {
+    $rootId = (string) Str::ulid();
+    $firstId = (string) Str::ulid();
+    $secondId = (string) Str::ulid();
+    $thirdId = (string) Str::ulid();
+
+    DB::table('categories')->insert([
+        [
+            'id' => $rootId,
+            'name' => 'Fragrances',
+            'slug' => 'fragrances',
+            'parent_id' => null,
+            'is_active' => true,
+            'sort_order' => 1,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ],
+        [
+            'id' => $firstId,
+            'name' => 'Perfume Oils',
+            'slug' => 'perfume-oils',
+            'parent_id' => $rootId,
+            'is_active' => true,
+            'sort_order' => 1,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ],
+        [
+            'id' => $secondId,
+            'name' => 'Eau de Parfum',
+            'slug' => 'eau-de-parfum',
+            'parent_id' => $rootId,
+            'is_active' => true,
+            'sort_order' => 2,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ],
+        [
+            'id' => $thirdId,
+            'name' => 'Gift Sets',
+            'slug' => 'gift-sets',
+            'parent_id' => $rootId,
+            'is_active' => true,
+            'sort_order' => 3,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ],
+    ]);
+
+    $response = $this->getJson('/api/v1/storefronts/fragrances/categories')
+        ->assertOk();
+
+    expect($response->json('data.0.children.*.slug'))->toBe([
+        'perfume-oils',
+        'eau-de-parfum',
+        'gift-sets',
+    ]);
 });
 
 it('returns 404 for a product outside the storefront category tree', function () {
