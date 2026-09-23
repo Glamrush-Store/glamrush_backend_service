@@ -68,7 +68,10 @@ class EloquentCategoryRepository implements CategoryRepository
             );
         }
 
-        $categories = $builder->get();
+        $categories = $builder
+            ->orderBy('sort_order')
+            ->orderBy('id')
+            ->get();
 
         if ($query->storefrontRootSlug) {
             $categories->each(fn (Category $category) => $this->removeInactiveDescendants($category));
