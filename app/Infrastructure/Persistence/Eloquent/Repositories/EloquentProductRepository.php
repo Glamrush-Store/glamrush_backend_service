@@ -393,12 +393,13 @@ final class EloquentProductRepository implements ProductRepository
         }
 
         $categoryQuery = Category::query()
-            ->selectRaw('categories.id, categories.name, categories.slug, COUNT(DISTINCT products.id) as count')
+            ->selectRaw('categories.id, categories.name, categories.slug, categories.sort_order, COUNT(DISTINCT products.id) as count')
             ->join('category_product', 'category_product.category_id', '=', 'categories.id')
             ->join('products', 'products.id', '=', 'category_product.product_id')
             ->whereIn('products.id', $productIds)
-            ->groupBy('categories.id', 'categories.name', 'categories.slug')
-            ->orderByDesc('count');
+            ->groupBy('categories.id', 'categories.name', 'categories.slug', 'categories.sort_order')
+            ->orderBy('categories.sort_order')
+            ->orderBy('categories.name');
 
         if ($query->categorySlug) {
             $parent = Category::where('slug', $query->categorySlug)->first();
@@ -412,6 +413,7 @@ final class EloquentProductRepository implements ProductRepository
                 'id' => $row->id,
                 'name' => $row->name,
                 'slug' => $row->slug,
+                'sort_order' => (int) $row->sort_order,
                 'count' => (int) $row->count,
             ])
             ->values()

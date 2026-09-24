@@ -1,5 +1,6 @@
 <?php
 
+use App\Infrastructure\Payment\Gateways\PaystackPaymentGateway;
 use App\Infrastructure\Persistence\Eloquent\Models\Order;
 use App\Infrastructure\Persistence\Eloquent\Models\Payment;
 use App\Infrastructure\Persistence\Eloquent\Models\PaymentTransaction;
@@ -163,11 +164,11 @@ it('applies a verified provider transaction and inventory commitment exactly onc
     ]);
 
     Http::fake([
-        'https://api.paystack.co/transaction/*' => Http::response([
+        "https://api.paystack.co/transaction/verify/{$payment->reference}" => Http::response([
             'status' => true,
             'data' => [
                 'reference' => $payment->reference,
-                'id' => 'provider-transaction-100',
+                'id' => 4099260516,
                 'status' => 'success',
                 'amount' => 1000000,
                 'currency' => 'NGN',
@@ -175,7 +176,7 @@ it('applies a verified provider transaction and inventory commitment exactly onc
         ]),
     ]);
 
-    $payload = ['provider' => 'paystack', 'transaction_id' => 'provider-transaction-100'];
+    $payload = ['provider' => 'paystack', 'transaction_id' => $payment->reference];
 
     $this->postJson('/api/v1/payments/verify', $payload)->assertOk();
     $this->postJson('/api/v1/payments/verify', $payload)->assertOk();
@@ -192,6 +193,19 @@ it('applies a verified provider transaction and inventory commitment exactly onc
         ->and(PaymentTransaction::query()->where('type', 'verify')->count())->toBe(1)
         ->and(PaymentTransaction::query()->where('type', 'paid')->count())->toBe(1)
         ->and(DB::table('outbox_messages')->where('event_key', "order:{$order->id}:paid")->count())->toBe(1);
+
+    Http::assertSent(fn ($request) => $request->url() === "https://api.paystack.co/transaction/verify/{$payment->reference}");
+});
+
+it('uses the Paystack reference from a webhook for verification', function () {
+    $gateway = app(PaystackPaymentGateway::class);
+
+    expect($gateway->transactionIdFromWebhook([
+        'data' => [
+            'id' => 4099260516,
+            'reference' => 'PAY-WEBHOOK-REFERENCE',
+        ],
+    ]))->toBe('PAY-WEBHOOK-REFERENCE');
 });
 
 function paymentMethod(string $code, string $name): string

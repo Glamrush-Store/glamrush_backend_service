@@ -14,7 +14,8 @@ final class CategoryEntity
         public readonly string $name,
         public readonly string $slug,
         public array $children = [],
-        public array $images = []
+        public array $images = [],
+        public readonly int $sortOrder = 0,
     ) {
     }
 }

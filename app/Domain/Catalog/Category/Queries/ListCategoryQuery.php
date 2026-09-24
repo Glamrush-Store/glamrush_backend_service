@@ -23,7 +23,7 @@ final class ListCategoryQuery implements CacheableQuery
 
     public function cacheKey(): string
     {
-        return 'categories'.md5(json_encode([
+        return 'categories:v2:'.md5(json_encode([
             'parent' => $this->parent,
             'perPage' => $this->perPage,
             'deep' => $this->deep,

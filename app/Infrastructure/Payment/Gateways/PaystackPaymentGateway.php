@@ -51,8 +51,10 @@ final class PaystackPaymentGateway implements PaymentGateway
 
     public function verify(string $transactionId): PaymentVerificationEntity
     {
+        $reference = rawurlencode($transactionId);
+
         $response = Http::withToken($this->secretKey())
-            ->get("https://api.paystack.co/transaction/{$transactionId}");
+            ->get("https://api.paystack.co/transaction/verify/{$reference}");
 
         if (! $response->successful() || ! $response->json('status')) {
             throw new RuntimeException($response->json('message') ?? 'Unable to verify Paystack payment.');
@@ -83,9 +85,9 @@ final class PaystackPaymentGateway implements PaymentGateway
 
     public function transactionIdFromWebhook(array $payload): ?string
     {
-        $id = $payload['data']['id'] ?? null;
+        $reference = $payload['data']['reference'] ?? null;
 
-        return $id !== null ? (string) $id : null;
+        return $reference !== null ? (string) $reference : null;
     }
 
     private function secretKey(): string
