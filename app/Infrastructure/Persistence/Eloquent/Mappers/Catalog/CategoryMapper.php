@@ -44,6 +44,7 @@ final class CategoryMapper
                 'thumb' => SafeMediaUrl::get($media, 'thumb'),
                 'medium' => SafeMediaUrl::get($media, 'medium'),
             ] : [],
+            sortOrder: (int) $model->sort_order,
         );
     }
 }

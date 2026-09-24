@@ -18,7 +18,8 @@ class CategoryResource extends JsonResource
             'id' => $this->id,
             'name' => $this->name,
             'slug' => $this->slug,
-            'images' => $this->images
+            'images' => $this->images,
+            'sort_order' => $this->sortOrder,
         ];
 
         if (!empty($this->children)) {

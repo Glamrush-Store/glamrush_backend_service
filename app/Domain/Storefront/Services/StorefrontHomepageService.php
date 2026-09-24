@@ -41,7 +41,7 @@ final class StorefrontHomepageService
     public function get(string $storefront): array
     {
         $ttl = max(0, (int) config('storefront.homepage.cache_ttl', 300));
-        $key = "storefront:{$storefront}:homepage:v7";
+        $key = "storefront:{$storefront}:homepage:v8";
 
         if ($ttl === 0) {
             return $this->build($storefront);
@@ -384,7 +384,7 @@ final class StorefrontHomepageService
             ->whereIn('id', $this->storefrontContext->categoryIds())
             ->where('is_active', true)
             ->with('media')
-            ->get(['id', 'name', 'slug', 'parent_id', 'is_active'])
+            ->get(['id', 'name', 'slug', 'parent_id', 'is_active', 'sort_order'])
             ->keyBy('id');
     }
 
