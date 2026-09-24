@@ -32,7 +32,7 @@ final class ListProductsQuery implements CacheableQuery
 
     public function cacheKey(): string
     {
-        return 'catalog:products:'.md5(json_encode([
+        return 'catalog:products:v2:'.md5(json_encode([
             'category' => $this->categorySlug,
             'brand' => $this->brandSlug,
             'collection' => $this->collectionSlug,
