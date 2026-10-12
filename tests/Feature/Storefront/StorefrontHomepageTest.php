@@ -1,15 +1,24 @@
 <?php
 
+use App\Domain\Storefront\Enums\HomepageSectionType;
 use App\Infrastructure\Caching\CacheTags;
 use App\Infrastructure\Caching\CacheVersionManager;
+use App\Infrastructure\Persistence\Eloquent\Models\StorefrontHomepageSection;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 
 uses(RefreshDatabase::class);
+
+it('recognizes split image banners as a homepage section type', function () {
+    expect(HomepageSectionType::tryFrom('split_image_banner'))
+        ->toBe(HomepageSectionType::SplitImageBanner);
+});
 
 beforeEach(function () {
     Carbon::setTestNow('2026-08-05 12:00:00');
@@ -367,6 +376,77 @@ it('orders sections and excludes future expired and disabled sections', function
         ->assertJsonCount(2, 'data.sections')
         ->assertJsonPath('data.sections.0.title', 'First')
         ->assertJsonPath('data.sections.1.title', 'Second');
+});
+
+it('uses the section id as the stable display order tie-breaker', function () {
+    $firstId = '01J0000000000000000000000A';
+    $secondId = '01J0000000000000000000000B';
+
+    homepageSection('newest_products', [], [
+        'id' => $secondId,
+        'title' => 'Second',
+        'display_order' => 4,
+    ]);
+    homepageSection('random_categories', [], [
+        'id' => $firstId,
+        'title' => 'First',
+        'display_order' => 4,
+    ]);
+
+    $this->getJson('/api/v1/storefronts/fragrances/homepage')
+        ->assertOk()
+        ->assertJsonPath('data.sections.0.id', $firstId)
+        ->assertJsonPath('data.sections.1.id', $secondId);
+});
+
+it('hydrates split image banners with sorted desktop sides and one mobile image', function () {
+    Storage::fake(config('media-library.disk_name'));
+    $sectionId = homepageSection('split_image_banner', [
+        'items' => [
+            [
+                'slot' => 'right',
+                'description' => 'Warm scents for evenings.',
+                'cta_label' => 'Shop warm',
+                'cta_url' => null,
+                'sort_order' => 20,
+            ],
+            [
+                'slot' => 'left',
+                'description' => 'Fresh scents for every day.',
+                'cta_label' => 'Shop fresh',
+                'cta_url' => '/collections/fresh',
+                'sort_order' => 10,
+            ],
+            'not-an-item',
+            ['slot' => 'middle', 'description' => 'Invalid slot', 'sort_order' => 30],
+            ['slot' => 'left', 'description' => '', 'sort_order' => 40],
+            ['slot' => 'right', 'description' => ['invalid'], 'sort_order' => 50],
+            ['slot' => 'right', 'description' => 'Missing order'],
+        ],
+    ]);
+
+    $section = StorefrontHomepageSection::findOrFail($sectionId);
+    $section->addMedia(UploadedFile::fake()->image('left.jpg'))->toMediaCollection('left-image');
+    $section->addMedia(UploadedFile::fake()->image('right.jpg'))->toMediaCollection('right-image');
+    $section->addMedia(UploadedFile::fake()->image('mobile.jpg'))->toMediaCollection('mobile-image');
+
+    $response = $this->getJson('/api/v1/storefronts/fragrances/homepage')->assertOk();
+
+    $response->assertJsonPath('data.sections.0.type', 'split_image_banner')
+        ->assertJsonCount(2, 'data.sections.0.items')
+        ->assertJsonPath('data.sections.0.items.0.slot', 'left')
+        ->assertJsonPath('data.sections.0.items.0.sort_order', 10)
+        ->assertJsonPath('data.sections.0.items.0.cta.label', 'Shop fresh')
+        ->assertJsonPath('data.sections.0.items.0.cta.url', '/collections/fresh')
+        ->assertJsonPath('data.sections.0.items.1.slot', 'right')
+        ->assertJsonPath('data.sections.0.items.1.cta', null);
+
+    expect($section->fresh()->getFirstMedia('left-image')?->file_name)->toBe('left.jpg')
+        ->and($section->fresh()->getFirstMedia('right-image')?->file_name)->toBe('right.jpg')
+        ->and($section->fresh()->getFirstMedia('mobile-image')?->file_name)->toBe('mobile.jpg')
+        ->and($response->json('data.sections.0.items.0.image'))->toContain('left.jpg')
+        ->and($response->json('data.sections.0.items.1.image'))->toContain('right.jpg')
+        ->and($response->json('data.sections.0.mobile_image'))->toContain('mobile.jpg');
 });
 
 it('hydrates featured category collection newest and manual product sections', function () {
