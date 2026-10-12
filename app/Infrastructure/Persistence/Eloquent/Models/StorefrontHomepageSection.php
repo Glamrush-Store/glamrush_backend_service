@@ -6,10 +6,12 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
+use Spatie\MediaLibrary\HasMedia;
+use Spatie\MediaLibrary\InteractsWithMedia;
 
-final class StorefrontHomepageSection extends Model
+final class StorefrontHomepageSection extends Model implements HasMedia
 {
-    use HasUlids;
+    use HasUlids, InteractsWithMedia;
 
     public $incrementing = false;
 
@@ -36,6 +38,15 @@ final class StorefrontHomepageSection extends Model
             ->using(StorefrontHomepageSectionProduct::class)
             ->withPivot('display_order')
             ->orderByPivot('display_order');
+    }
+
+    public function registerMediaCollections(): void
+    {
+        $mimeTypes = ['image/jpeg', 'image/png', 'image/webp'];
+
+        $this->addMediaCollection('left-image')->acceptsMimeTypes($mimeTypes)->singleFile();
+        $this->addMediaCollection('right-image')->acceptsMimeTypes($mimeTypes)->singleFile();
+        $this->addMediaCollection('mobile-image')->acceptsMimeTypes($mimeTypes)->singleFile();
     }
 
     public function scopeActive(Builder $query): Builder

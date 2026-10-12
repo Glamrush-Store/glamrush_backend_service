@@ -62,6 +62,7 @@ it('invalidates every cache family affected by model changes', function () {
     $productMedia = (new Media)->forceFill(['model_type' => 'product']);
     $categoryMedia = (new Media)->forceFill(['model_type' => 'category']);
     $campaignMedia = (new Media)->forceFill(['model_type' => 'storefront_campaign']);
+    $sectionMedia = (new Media)->forceFill(['model_type' => 'storefront_homepage_section']);
 
     $cases = [
         [new Product, [CacheTags::CATALOG, CacheTags::PRODUCTS, CacheTags::HOMEPAGE]],
@@ -78,6 +79,7 @@ it('invalidates every cache family affected by model changes', function () {
         [$productMedia, [CacheTags::PRODUCTS, CacheTags::HOMEPAGE]],
         [$categoryMedia, [CacheTags::CATEGORIES, CacheTags::HOMEPAGE, CacheTags::STOREFRONTS]],
         [$campaignMedia, [CacheTags::HOMEPAGE]],
+        [$sectionMedia, [CacheTags::HOMEPAGE]],
         [new PaymentMethod, [CacheTags::PAYMENT_METHODS]],
         [new ShippingMethod, [CacheTags::SHIPPING]],
         [new ShippingRate, [CacheTags::SHIPPING]],
@@ -101,4 +103,18 @@ it('invalidates every cache family affected by model changes', function () {
         }
         expect(Cache::tags(['unrelated'])->get('test:unrelated'))->toBe('cached');
     }
+});
+
+it('invalidates the homepage cache family when homepage section media changes', function () {
+    Cache::tags([CacheTags::HOMEPAGE])->put('test:homepage', 'cached', 60);
+    Cache::tags(['unrelated'])->put('test:unrelated', 'cached', 60);
+
+    $media = (new Media)->forceFill([
+        'model_type' => 'storefront_homepage_section',
+    ]);
+
+    (new CacheInvalidationObserver)->updated($media);
+
+    expect(Cache::tags([CacheTags::HOMEPAGE])->get('test:homepage'))->toBeNull()
+        ->and(Cache::tags(['unrelated'])->get('test:unrelated'))->toBe('cached');
 });
