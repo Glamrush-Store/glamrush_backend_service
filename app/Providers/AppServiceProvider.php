@@ -16,8 +16,8 @@ use App\Domain\Shipping\Contracts\ShippingRepository;
 use App\Domain\User\Contracts\AddressRepository;
 use App\Domain\User\Contracts\SocialAccountRepository;
 use App\Domain\User\Contracts\UserRepository;
-use App\Infrastructure\Caching\CacheInvalidationObserver;
 use App\Infrastructure\CacheMetrics\RegisterCacheMetricsListeners;
+use App\Infrastructure\Caching\CacheInvalidationObserver;
 use App\Infrastructure\Persistence\Eloquent\Models\AttributeType;
 use App\Infrastructure\Persistence\Eloquent\Models\Brand;
 use App\Infrastructure\Persistence\Eloquent\Models\Category;
@@ -31,6 +31,7 @@ use App\Infrastructure\Persistence\Eloquent\Models\ProductVariant;
 use App\Infrastructure\Persistence\Eloquent\Models\ShippingMethod;
 use App\Infrastructure\Persistence\Eloquent\Models\ShippingRate;
 use App\Infrastructure\Persistence\Eloquent\Models\ShippingZone;
+use App\Infrastructure\Persistence\Eloquent\Models\ShippingZoneLocation;
 use App\Infrastructure\Persistence\Eloquent\Models\StorefrontCampaign;
 use App\Infrastructure\Persistence\Eloquent\Models\StorefrontHomepageSection;
 use App\Infrastructure\Persistence\Eloquent\Models\StorefrontHomepageSectionProduct;
@@ -140,6 +141,7 @@ class AppServiceProvider extends ServiceProvider
             'product' => Product::class,
             'product_variant' => ProductVariant::class,
             'storefront_campaign' => StorefrontCampaign::class,
+            'storefront_homepage_section' => StorefrontHomepageSection::class,
             'content_page' => ContentPage::class,
             'user' => User::class,
         ]);
@@ -160,6 +162,7 @@ class AppServiceProvider extends ServiceProvider
             ShippingMethod::class,
             ShippingRate::class,
             ShippingZone::class,
+            ShippingZoneLocation::class,
             Media::class,
         ] as $model) {
             $model::observe(CacheInvalidationObserver::class);
@@ -167,4 +170,3 @@ class AppServiceProvider extends ServiceProvider
 
     }
 }
-

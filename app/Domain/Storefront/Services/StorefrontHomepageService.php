@@ -41,7 +41,7 @@ final class StorefrontHomepageService
     public function get(string $storefront): array
     {
         $ttl = max(0, (int) config('storefront.homepage.cache_ttl', 300));
-        $key = "storefront:{$storefront}:homepage:v8";
+        $key = "storefront:{$storefront}:homepage:v9";
 
         if ($ttl === 0) {
             return $this->build($storefront);
@@ -79,6 +79,7 @@ final class StorefrontHomepageService
         $sections = StorefrontHomepageSection::query()
             ->forStorefront($storefront)
             ->published()
+            ->with('media')
             ->inDisplayOrder()
             ->get();
 
@@ -145,6 +146,7 @@ final class StorefrontHomepageService
                 HomepageSectionType::NewestProducts => $this->newestProducts($section),
                 HomepageSectionType::RandomCategories => $this->randomCategories($section),
                 HomepageSectionType::ManualProducts => $this->manualProducts($section),
+                HomepageSectionType::SplitImageBanner => $this->splitImageItems($section),
             };
         } catch (Throwable $exception) {
             Log::warning('Unable to hydrate storefront homepage section.', [
@@ -157,7 +159,7 @@ final class StorefrontHomepageService
             $items = [];
         }
 
-        return [
+        $data = [
             'id' => $section->id,
             'type' => $type->value,
             'title' => $section->title,
@@ -165,6 +167,81 @@ final class StorefrontHomepageService
             'display_order' => $section->display_order,
             'items' => $items,
         ];
+
+        if ($type === HomepageSectionType::SplitImageBanner) {
+            $data['mobile_image'] = $this->sectionMediaUrl($section, 'mobile-image');
+        }
+
+        return $data;
+    }
+
+    private function splitImageItems(StorefrontHomepageSection $section): array
+    {
+        $items = $this->config($section)['items'] ?? [];
+
+        if (! is_array($items)) {
+            return [];
+        }
+
+        return collect($items)
+            ->map(function (mixed $item) use ($section): ?array {
+                if (! is_array($item)) {
+                    return null;
+                }
+
+                $slot = $item['slot'] ?? null;
+                $description = $item['description'] ?? null;
+                $sortOrder = filter_var($item['sort_order'] ?? null, FILTER_VALIDATE_INT);
+
+                if (
+                    ! is_string($slot)
+                    || ! in_array($slot, ['left', 'right'], true)
+                    || ! is_string($description)
+                    || trim($description) === ''
+                    || $sortOrder === false
+                ) {
+                    return null;
+                }
+
+                $label = $this->optionalString($item['cta_label'] ?? null);
+                $url = $this->optionalString($item['cta_url'] ?? null);
+
+                return [
+                    'slot' => $slot,
+                    'sort_order' => $sortOrder,
+                    'image' => $this->sectionMediaUrl($section, "{$slot}-image"),
+                    'description' => trim($description),
+                    'cta' => $label !== null && $url !== null ? [
+                        'label' => $label,
+                        'url' => $url,
+                    ] : null,
+                ];
+            })
+            ->filter()
+            ->sortBy([
+                [fn (array $item) => $item['sort_order'], 'asc'],
+                [fn (array $item) => (string) $item['slot'], 'asc'],
+            ])
+            ->values()
+            ->all();
+    }
+
+    private function optionalString(mixed $value): ?string
+    {
+        if (! is_string($value)) {
+            return null;
+        }
+
+        $value = trim($value);
+
+        return $value !== '' ? $value : null;
+    }
+
+    private function sectionMediaUrl(StorefrontHomepageSection $section, string $collection): string
+    {
+        $media = $section->getFirstMedia($collection);
+
+        return $media ? SafeMediaUrl::get($media) : '';
     }
 
     private function featuredProducts(StorefrontHomepageSection $section): array

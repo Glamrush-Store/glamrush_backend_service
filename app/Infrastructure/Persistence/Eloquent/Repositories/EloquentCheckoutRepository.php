@@ -6,7 +6,6 @@ use App\Domain\Catalog\Cart\CartIdentifier;
 use App\Domain\Catalog\Cart\Exceptions\InsufficientStockException;
 use App\Domain\Catalog\Storefront\StorefrontContext;
 use App\Domain\Discount\Services\DiscountService;
-use App\Domain\Location\Services\LocationService;
 use App\Domain\Order\Actions\GenerateOrderNumberAction;
 use App\Domain\Order\Contracts\CheckoutRepository;
 use App\Domain\Order\Entities\CheckoutResult;
@@ -18,6 +17,7 @@ use App\Infrastructure\Persistence\Eloquent\Models\Order;
 use App\Infrastructure\Persistence\Eloquent\Models\ProductVariant;
 use App\Infrastructure\Persistence\Eloquent\Models\ShippingRate;
 use App\Infrastructure\Persistence\Eloquent\Models\ShippingZone;
+use App\Infrastructure\Persistence\Eloquent\Services\ShippingZoneMatcher;
 use App\Support\Media\SafeMediaUrl;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\DB;
@@ -31,7 +31,7 @@ final class EloquentCheckoutRepository implements CheckoutRepository
         private readonly StorefrontContext $storefrontContext,
         private readonly OutboxService $outbox,
         private readonly DiscountService $discounts,
-        private readonly LocationService $locations,
+        private readonly ShippingZoneMatcher $zoneMatcher,
     ) {}
 
     public function createPendingOrderFromCart(
@@ -314,34 +314,7 @@ final class EloquentCheckoutRepository implements CheckoutRepository
 
     private function findBestZoneForAddress(ShippingAddressEntity $address): ?ShippingZone
     {
-        $countries = $this->locations->countryIdentifiers($address->country);
-        $states = $this->locations->stateIdentifiers($address->country, $address->state);
-
-        return ShippingZone::query()
-            ->where('is_active', true)
-            ->whereIn('country', $countries)
-            ->where(function ($query) use ($address, $states) {
-                if ($address->state && $address->city) {
-                    $query->orWhere(function ($q) use ($address, $states) {
-                        $q->whereIn('state', $states)
-                            ->where('city', $address->city);
-                    });
-                }
-
-                if ($address->state) {
-                    $query->orWhere(function ($q) use ($states) {
-                        $q->whereIn('state', $states)
-                            ->whereNull('city');
-                    });
-                }
-
-                $query->orWhere(function ($q) {
-                    $q->whereNull('state')
-                        ->whereNull('city');
-                });
-            })
-            ->orderByRaw('CASE WHEN city = ? THEN 1 WHEN state IS NOT NULL THEN 2 ELSE 3 END', [$address->city])
-            ->first();
+        return $this->zoneMatcher->find($address);
     }
 
     private function calculateShippingAmount(ShippingRate $rate, float $cartSubtotal): float

@@ -11,6 +11,7 @@ class ShippingZone extends Model
     use HasUlids;
 
     public $incrementing = false;
+
     protected $keyType = 'string';
 
     protected $fillable = [
@@ -25,6 +26,11 @@ class ShippingZone extends Model
     public function rates(): HasMany
     {
         return $this->hasMany(ShippingRate::class);
+    }
+
+    public function locations(): HasMany
+    {
+        return $this->hasMany(ShippingZoneLocation::class);
     }
 
     public function shipments(): HasMany

@@ -14,6 +14,7 @@ use App\Infrastructure\Persistence\Eloquent\Models\ProductVariant;
 use App\Infrastructure\Persistence\Eloquent\Models\ShippingMethod;
 use App\Infrastructure\Persistence\Eloquent\Models\ShippingRate;
 use App\Infrastructure\Persistence\Eloquent\Models\ShippingZone;
+use App\Infrastructure\Persistence\Eloquent\Models\ShippingZoneLocation;
 use App\Infrastructure\Persistence\Eloquent\Models\StorefrontCampaign;
 use App\Infrastructure\Persistence\Eloquent\Models\StorefrontHomepageSection;
 use App\Infrastructure\Persistence\Eloquent\Models\StorefrontHomepageSectionProduct;
@@ -90,7 +91,8 @@ final class CacheInvalidationObserver implements ShouldHandleEventsAfterCommit
             $model instanceof PaymentMethod => [CacheTags::PAYMENT_METHODS],
             $model instanceof ShippingMethod,
             $model instanceof ShippingRate,
-            $model instanceof ShippingZone => [CacheTags::SHIPPING],
+            $model instanceof ShippingZone,
+            $model instanceof ShippingZoneLocation => [CacheTags::SHIPPING],
             $model instanceof Media => $this->mediaTags($model),
             default => [],
         };
@@ -118,6 +120,7 @@ final class CacheInvalidationObserver implements ShouldHandleEventsAfterCommit
                 CacheTags::STOREFRONTS,
             ],
             'storefront_campaign', StorefrontCampaign::class => [CacheTags::HOMEPAGE],
+            'storefront_homepage_section', StorefrontHomepageSection::class => [CacheTags::HOMEPAGE],
             default => [],
         };
     }

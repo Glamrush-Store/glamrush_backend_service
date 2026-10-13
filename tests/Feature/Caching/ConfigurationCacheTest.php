@@ -1,6 +1,5 @@
 <?php
 
-use App\Domain\Location\Services\LocationService;
 use App\Domain\Shipping\Entities\ShippingAddressEntity;
 use App\Infrastructure\Caching\CacheTags;
 use App\Infrastructure\Caching\QueryCache;
@@ -121,7 +120,7 @@ it('caches shipping zone and rate configuration independently of subtotal calcul
         'updated_at' => now(),
     ]);
 
-    $repository = new EloquentShippingRepository(app(LocationService::class));
+    $repository = app(EloquentShippingRepository::class);
     $address = new ShippingAddressEntity('NGA', 'LA', 'Ikeja', null);
 
     expect($repository->findBestZoneForAddress($address)?->name)->toBe('Lagos Zone')
