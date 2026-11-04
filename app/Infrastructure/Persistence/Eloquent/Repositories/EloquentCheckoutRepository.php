@@ -17,6 +17,7 @@ use App\Infrastructure\Persistence\Eloquent\Models\Order;
 use App\Infrastructure\Persistence\Eloquent\Models\ProductVariant;
 use App\Infrastructure\Persistence\Eloquent\Models\ShippingRate;
 use App\Infrastructure\Persistence\Eloquent\Models\ShippingZone;
+use App\Infrastructure\Persistence\Eloquent\Scopes\PublishedScope;
 use App\Infrastructure\Persistence\Eloquent\Services\ShippingZoneMatcher;
 use App\Support\Media\SafeMediaUrl;
 use Illuminate\Database\Eloquent\Builder;
@@ -243,14 +244,14 @@ final class EloquentCheckoutRepository implements CheckoutRepository
     {
         return CartItem::query()
             ->with([
-                'product' => fn ($query) => $query->withoutGlobalScopes()->with($this->productCheckoutRelations()),
+                'product' => fn ($query) => $query->withoutGlobalScope(PublishedScope::class)->with($this->productCheckoutRelations()),
                 'product.defaultVariant.media',
                 'variant.media',
             ])
             ->tap(fn (Builder $query) => $this->constrainCart($query, $cartIdentifier))
             ->when($this->storefrontContext->isActive(), function (Builder $query) {
                 $query->whereHas('product', fn (Builder $productQuery) => $productQuery
-                    ->withoutGlobalScopes()
+                    ->withoutGlobalScope(PublishedScope::class)
                     ->whereHas('categories', fn (Builder $categoryQuery) => $categoryQuery->whereIn('categories.id', $this->storefrontContext->categoryIds())));
             })
             ->get();

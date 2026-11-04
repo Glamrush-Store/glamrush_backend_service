@@ -31,6 +31,7 @@ beforeEach(function () {
         $table->integer('stock_quantity')->default(0);
         $table->boolean('in_stock')->default(true);
         $table->timestamps();
+        $table->softDeletes();
     });
 
     Schema::create('categories', function ($table) {
@@ -271,6 +272,24 @@ test('guest get with token returns their items', function () {
         ->assertJsonPath('data.0.name', 'Token Product')
         ->assertJsonPath('data.0.quantity', 2)
         ->assertJsonPath('cart_token', $token);
+});
+
+test('cart does not return soft-deleted products', function () {
+    $token = Str::uuid()->toString();
+    $product = cartProduct(['name' => 'Deleted Cart Product']);
+
+    CartItem::create([
+        'cart_token' => $token,
+        'product_id' => $product->id,
+        'quantity' => 1,
+        'expires_at' => now()->addHour(),
+    ]);
+    DB::table('products')->where('id', $product->id)->update(['deleted_at' => now()]);
+
+    $this->withHeaders(guestHeaders($token))
+        ->getJson('/api/v1/cart')
+        ->assertOk()
+        ->assertJsonPath('data', []);
 });
 
 // ---------------------------------------------------------------------------

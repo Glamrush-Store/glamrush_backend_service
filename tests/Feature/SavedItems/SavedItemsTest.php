@@ -18,6 +18,7 @@ beforeEach(function () {
         $table->timestamp('published_at')->nullable();
         $table->string('type')->default('simple');
         $table->timestamps();
+        $table->softDeletes();
     });
 });
 
@@ -38,7 +39,7 @@ function createProduct(array $overrides = []): Product
 {
     return Product::create(array_merge([
         'name' => 'Test Product',
-        'slug' => 'test-product-' . uniqid(),
+        'slug' => 'test-product-'.uniqid(),
         'status' => 'published',
         'published_at' => now()->subDay(),
         'type' => 'simple',
@@ -79,6 +80,22 @@ test('list returns saved items with correct shape', function () {
         ->assertJsonPath('data.0.name', 'My Saved Product')
         ->assertJsonPath('data.0.slug', 'my-saved-product')
         ->assertJsonPath('data.0.thumb', null);
+});
+
+test('saved items hide and reject soft-deleted products', function () {
+    $user = createUser();
+    $product = createProduct(['name' => 'Deleted Saved Product']);
+    SavedItem::create(['user_id' => $user->id, 'product_id' => $product->id]);
+    $product->delete();
+
+    Sanctum::actingAs($user);
+
+    $this->getJson('/api/v1/saved-items')
+        ->assertOk()
+        ->assertJsonPath('data', []);
+
+    $this->postJson('/api/v1/saved-items', ['product_id' => $product->id])
+        ->assertUnprocessable();
 });
 
 // ---------------------------------------------------------------------------
@@ -175,8 +192,8 @@ test('unauthenticated sync returns 401', function () {
 
 test('sync inserts only missing items', function () {
     $user = createUser();
-    $existing = createProduct(['slug' => 'existing-' . uniqid()]);
-    $newOne = createProduct(['slug' => 'new-' . uniqid()]);
+    $existing = createProduct(['slug' => 'existing-'.uniqid()]);
+    $newOne = createProduct(['slug' => 'new-'.uniqid()]);
 
     SavedItem::create(['user_id' => $user->id, 'product_id' => $existing->id]);
 

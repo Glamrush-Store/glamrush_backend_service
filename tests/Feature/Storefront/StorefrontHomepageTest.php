@@ -68,6 +68,7 @@ beforeEach(function () {
         $table->string('brand_id')->nullable();
         $table->string('vendor_id')->nullable();
         $table->timestamps();
+        $table->softDeletes();
     });
     Schema::create('category_product', function ($table) {
         $table->string('id')->primary();
@@ -481,6 +482,25 @@ it('hydrates featured category collection newest and manual product sections', f
     expect($response->json('data.sections.2.items.*.name'))->toBe(['Newest', 'Featured']);
     expect($response->json('data.sections.3.items.*.name'))->toBe(['Newest']);
     expect($response->json('data.sections.4.items.*.name'))->toBe(['Newest', 'Featured']);
+});
+
+it('excludes soft-deleted products from homepage sections and category counts', function () {
+    $root = DB::table('categories')->where('slug', 'fragrances')->value('id');
+    $child = homepageCategory('Perfume Oils', 'perfume-oils', $root);
+
+    homepageProduct('Visible Perfume', $child, ['is_featured' => true]);
+    homepageProduct('Deleted Perfume', $child, [
+        'is_featured' => true,
+        'deleted_at' => now(),
+    ]);
+
+    homepageSection('featured_products', [], ['display_order' => 1]);
+    homepageSection('random_categories', [], ['display_order' => 2]);
+
+    $response = $this->getJson('/api/v1/storefronts/fragrances/homepage')->assertOk();
+
+    expect($response->json('data.sections.0.items.*.name'))->toBe(['Visible Perfume'])
+        ->and($response->json('data.sections.1.items.0.product_count'))->toBe(1);
 });
 
 it('returns only valid available sales with simple and default variant prices', function () {
