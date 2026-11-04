@@ -5,8 +5,8 @@
  * See the LICENSE file for details.
  */
 
-use App\Features\Product\DTOs\ProductVariantDto;
-use App\Features\Product\Mappers\ProductVariantMapper;
+use App\Domain\Catalog\Product\DTOs\ProductVariantDto;
+use App\Domain\Catalog\Product\Mappers\ProductVariantMapper;
 use App\Shared\DTOs\PriceDto;
 use Tests\Support\Factories\ProductVariantFactory;
 

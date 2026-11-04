@@ -1,0 +1,608 @@
+<?php
+
+use App\Domain\Storefront\Enums\HomepageSectionType;
+use App\Infrastructure\Caching\CacheTags;
+use App\Infrastructure\Caching\CacheVersionManager;
+use App\Infrastructure\Persistence\Eloquent\Models\StorefrontHomepageSection;
+use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
+
+uses(RefreshDatabase::class);
+
+it('recognizes split image banners as a homepage section type', function () {
+    expect(HomepageSectionType::tryFrom('split_image_banner'))
+        ->toBe(HomepageSectionType::SplitImageBanner);
+});
+
+beforeEach(function () {
+    Carbon::setTestNow('2026-08-05 12:00:00');
+    config()->set('storefront.homepage.cache_ttl', 300);
+    config()->set('storefront.homepage.max_item_limit', 3);
+    Cache::flush();
+
+    Schema::create('categories', function ($table) {
+        $table->string('id')->primary();
+        $table->string('name');
+        $table->string('slug')->unique();
+        $table->string('parent_id')->nullable();
+        $table->boolean('is_active')->default(true);
+        $table->string('announcement_primary_text')->nullable();
+        $table->string('announcement_secondary_text')->nullable();
+        $table->timestamps();
+    });
+    Schema::create('brands', function ($table) {
+        $table->string('id')->primary();
+        $table->string('name');
+        $table->string('slug');
+        $table->timestamps();
+    });
+    Schema::create('vendors', function ($table) {
+        $table->string('id')->primary();
+        $table->string('name');
+        $table->string('slug');
+        $table->timestamps();
+    });
+    Schema::create('products', function ($table) {
+        $table->string('id')->primary();
+        $table->string('name');
+        $table->string('slug')->unique();
+        $table->string('sku')->nullable();
+        $table->string('type')->default('simple');
+        $table->string('status')->default('published');
+        $table->timestamp('published_at')->nullable();
+        $table->decimal('price', 12, 2)->default(0);
+        $table->decimal('sale_price', 12, 2)->nullable();
+        $table->timestamp('sale_starts_at')->nullable();
+        $table->timestamp('sale_ends_at')->nullable();
+        $table->boolean('manage_stock')->default(false);
+        $table->integer('stock_quantity')->default(0);
+        $table->boolean('in_stock')->default(true);
+        $table->boolean('is_featured')->default(false);
+        $table->integer('sort_order')->default(0);
+        $table->string('brand_id')->nullable();
+        $table->string('vendor_id')->nullable();
+        $table->timestamps();
+        $table->softDeletes();
+    });
+    Schema::create('category_product', function ($table) {
+        $table->string('id')->primary();
+        $table->string('product_id');
+        $table->string('category_id');
+        $table->boolean('is_primary')->default(false);
+        $table->unsignedInteger('sequence')->default(0);
+        $table->timestamps();
+
+        $table->unique(['product_id', 'category_id']);
+    });
+    Schema::create('product_variants', function ($table) {
+        $table->string('id')->primary();
+        $table->string('product_id');
+        $table->string('sku');
+        $table->boolean('is_default')->default(false);
+        $table->decimal('price', 12, 2);
+        $table->decimal('sale_price', 12, 2)->nullable();
+        $table->timestamp('sale_starts_at')->nullable();
+        $table->timestamp('sale_ends_at')->nullable();
+        $table->boolean('manage_stock')->default(false);
+        $table->integer('stock_quantity')->default(0);
+        $table->boolean('in_stock')->default(true);
+        $table->json('attributes')->nullable();
+        $table->integer('sort_order')->default(0);
+        $table->string('status')->default('active');
+        $table->timestamps();
+    });
+    Schema::create('collections', function ($table) {
+        $table->string('id')->primary();
+        $table->string('name');
+        $table->string('slug')->unique();
+        $table->boolean('is_active')->default(true);
+        $table->timestamps();
+    });
+    Schema::create('collection_product', function ($table) {
+        $table->string('collection_id');
+        $table->string('product_id');
+        $table->integer('sort_order')->default(0);
+    });
+    Schema::create('storefront_campaigns', function ($table) {
+        $table->string('id')->primary();
+        $table->string('storefront_slug');
+        $table->string('internal_name');
+        $table->string('eyebrow')->nullable();
+        $table->string('title');
+        $table->text('description')->nullable();
+        $table->string('cta_label')->nullable();
+        $table->string('cta_url')->nullable();
+        $table->integer('priority')->default(0);
+        $table->boolean('is_active')->default(false);
+        $table->timestamp('starts_at')->nullable();
+        $table->timestamp('ends_at')->nullable();
+        $table->timestamps();
+    });
+    Schema::create('storefront_homepage_sections', function ($table) {
+        $table->string('id')->primary();
+        $table->string('storefront_slug');
+        $table->string('type');
+        $table->string('title');
+        $table->string('subtitle')->nullable();
+        $table->json('config');
+        $table->integer('display_order')->default(0);
+        $table->boolean('is_active')->default(false);
+        $table->timestamp('starts_at')->nullable();
+        $table->timestamp('ends_at')->nullable();
+        $table->timestamps();
+    });
+    Schema::create('storefront_homepage_section_product', function ($table) {
+        $table->string('section_id');
+        $table->string('product_id');
+        $table->integer('display_order');
+    });
+    Schema::create('media', function ($table) {
+        $table->id();
+        $table->string('model_type');
+        $table->string('model_id');
+        $table->uuid('uuid')->nullable();
+        $table->string('collection_name');
+        $table->string('name');
+        $table->string('file_name');
+        $table->string('mime_type')->nullable();
+        $table->string('disk');
+        $table->string('conversions_disk')->nullable();
+        $table->unsignedBigInteger('size');
+        $table->json('manipulations');
+        $table->json('custom_properties');
+        $table->json('generated_conversions');
+        $table->json('responsive_images');
+        $table->unsignedInteger('order_column')->nullable();
+        $table->nullableTimestamps();
+    });
+
+    homepageCategory('Fragrances', 'fragrances');
+});
+
+afterEach(fn () => Carbon::setTestNow());
+
+function homepageCategory(string $name, string $slug, ?string $parentId = null, bool $active = true): string
+{
+    $id = (string) Str::ulid();
+    DB::table('categories')->insert(compact('id', 'name', 'slug') + [
+        'parent_id' => $parentId,
+        'is_active' => $active,
+        'created_at' => now(),
+        'updated_at' => now(),
+    ]);
+
+    return $id;
+}
+
+function homepageProduct(string $name, string $categoryId, array $overrides = []): string
+{
+    $id = (string) Str::ulid();
+    $productData = array_merge([
+        'id' => $id,
+        'name' => $name,
+        'slug' => Str::slug($name).'-'.Str::lower(Str::random(5)),
+        'sku' => 'SKU-'.Str::upper(Str::random(6)),
+        'type' => 'simple',
+        'status' => 'published',
+        'published_at' => now()->subDay(),
+        'price' => 10000,
+        'sale_price' => null,
+        'sale_starts_at' => null,
+        'sale_ends_at' => null,
+        'manage_stock' => false,
+        'stock_quantity' => 0,
+        'in_stock' => true,
+        'is_featured' => false,
+        'sort_order' => 0,
+        'brand_id' => null,
+        'vendor_id' => null,
+        'created_at' => now(),
+        'updated_at' => now(),
+    ], $overrides);
+    unset($productData['category_id']);
+    DB::table('products')->insert($productData);
+
+    DB::table('category_product')->insert([
+        'id' => (string) Str::ulid(),
+        'product_id' => $id,
+        'category_id' => $overrides['category_id'] ?? $categoryId,
+        'is_primary' => true,
+        'sequence' => (int) ($overrides['sort_order'] ?? 0),
+        'created_at' => now(),
+        'updated_at' => now(),
+    ]);
+
+    return $id;
+}
+
+function homepageVariant(string $productId, array $overrides = []): string
+{
+    $id = (string) Str::ulid();
+    DB::table('product_variants')->insert(array_merge([
+        'id' => $id,
+        'product_id' => $productId,
+        'sku' => 'VAR-'.Str::upper(Str::random(6)),
+        'is_default' => true,
+        'price' => 12000,
+        'sale_price' => null,
+        'sale_starts_at' => null,
+        'sale_ends_at' => null,
+        'manage_stock' => false,
+        'stock_quantity' => 0,
+        'in_stock' => true,
+        'attributes' => '[]',
+        'sort_order' => 0,
+        'status' => 'active',
+        'created_at' => now(),
+        'updated_at' => now(),
+    ], $overrides));
+
+    return $id;
+}
+
+function homepageCampaign(array $overrides = []): string
+{
+    $id = (string) Str::ulid();
+    DB::table('storefront_campaigns')->insert(array_merge([
+        'id' => $id,
+        'storefront_slug' => 'fragrances',
+        'internal_name' => 'Internal only',
+        'eyebrow' => 'After-dark fragrances',
+        'title' => 'Leave a trace.',
+        'description' => 'A magnetic collection for after dark.',
+        'cta_label' => 'Shop the campaign',
+        'cta_url' => '/collections/midnight-edit',
+        'priority' => 1,
+        'is_active' => true,
+        'starts_at' => null,
+        'ends_at' => null,
+        'created_at' => now(),
+        'updated_at' => now(),
+    ], $overrides));
+
+    return $id;
+}
+
+function homepageSection(string $type, array $config = [], array $overrides = []): string
+{
+    $id = (string) Str::ulid();
+    DB::table('storefront_homepage_sections')->insert(array_merge([
+        'id' => $id,
+        'storefront_slug' => 'fragrances',
+        'type' => $type,
+        'title' => Str::headline($type),
+        'subtitle' => null,
+        'config' => json_encode($config),
+        'display_order' => 1,
+        'is_active' => true,
+        'starts_at' => null,
+        'ends_at' => null,
+        'created_at' => now(),
+        'updated_at' => now(),
+    ], $overrides));
+
+    return $id;
+}
+
+it('returns a fully shaped homepage and handles empty content', function () {
+    $response = $this->getJson('/api/v1/storefronts/fragrances/homepage')
+        ->assertOk()
+        ->assertExactJson([
+            'success' => true,
+            'message' => 'Success',
+            'data' => [
+                'storefront' => [
+                    'slug' => 'fragrances',
+                    'name' => 'Fragrances',
+                    'announcement' => [
+                        'primary_text' => null,
+                        'secondary_text' => null,
+                    ],
+                ],
+                'campaign' => null,
+                'sections' => [],
+            ],
+        ]);
+
+    expect($response->headers->get('Cache-Control'))->toContain('public', 'max-age=60', 's-maxage=60')
+        ->and($response->headers->get('ETag'))->not->toBeNull()
+        ->and(Cache::tags(['storefronts', 'categories'])->has(
+            app(CacheVersionManager::class)->versionedKey(
+                'storefront:context:fragrances:v1',
+                [CacheTags::STOREFRONTS, CacheTags::CATEGORIES],
+            ),
+        ))->toBeTrue();
+
+    $this->withHeader('If-None-Match', $response->headers->get('ETag'))
+        ->getJson('/api/v1/storefronts/fragrances/homepage')
+        ->assertStatus(304);
+
+    $this->getJson('/api/v1/storefronts/unknown/homepage')
+        ->assertNotFound()
+        ->assertJsonPath('success', false);
+
+    $this->getJson('/api/v1/storefronts/fragrances/configuration')
+        ->assertOk()
+        ->assertJsonPath('data.announcement.primary_text', null)
+        ->assertJsonPath('data.announcement.secondary_text', null);
+});
+
+it('publishes the storefront announcement configured by an administrator', function () {
+    DB::table('categories')->where('slug', 'fragrances')->update([
+        'announcement_primary_text' => 'Free delivery today',
+        'announcement_secondary_text' => 'Book a private scent consultation',
+    ]);
+
+    $this->getJson('/api/v1/storefronts/fragrances/homepage')
+        ->assertOk()
+        ->assertJsonPath('data.storefront.announcement.primary_text', 'Free delivery today')
+        ->assertJsonPath('data.storefront.announcement.secondary_text', 'Book a private scent consultation');
+
+    $this->getJson('/api/v1/storefronts/fragrances/configuration')
+        ->assertOk()
+        ->assertHeaderMissing('ETag')
+        ->assertJsonPath('data.announcement.primary_text', 'Free delivery today')
+        ->assertJsonPath('data.announcement.secondary_text', 'Book a private scent consultation');
+});
+
+it('selects only the highest priority currently published campaign', function () {
+    homepageCampaign(['title' => 'Lower', 'priority' => 10]);
+    $winner = homepageCampaign(['title' => 'Winner', 'priority' => 20]);
+    homepageCampaign(['title' => 'Future', 'priority' => 100, 'starts_at' => now()->addMinute()]);
+    homepageCampaign(['title' => 'Expired', 'priority' => 100, 'ends_at' => now()->subMinute()]);
+    homepageCampaign(['title' => 'Disabled', 'priority' => 100, 'is_active' => false]);
+
+    $this->getJson('/api/v1/storefronts/fragrances/homepage')
+        ->assertOk()
+        ->assertJsonPath('data.campaign.id', $winner)
+        ->assertJsonPath('data.campaign.title', 'Winner')
+        ->assertJsonMissingPath('data.campaign.internal_name');
+});
+
+it('orders sections and excludes future expired and disabled sections', function () {
+    homepageSection('newest_products', [], ['title' => 'Second', 'display_order' => 2]);
+    homepageSection('featured_products', [], ['title' => 'First', 'display_order' => 1]);
+    homepageSection('sale_products', [], ['starts_at' => now()->addMinute()]);
+    homepageSection('sale_products', [], ['ends_at' => now()->subMinute()]);
+    homepageSection('sale_products', [], ['is_active' => false]);
+
+    $this->getJson('/api/v1/storefronts/fragrances/homepage')
+        ->assertOk()
+        ->assertJsonCount(2, 'data.sections')
+        ->assertJsonPath('data.sections.0.title', 'First')
+        ->assertJsonPath('data.sections.1.title', 'Second');
+});
+
+it('uses the section id as the stable display order tie-breaker', function () {
+    $firstId = '01J0000000000000000000000A';
+    $secondId = '01J0000000000000000000000B';
+
+    homepageSection('newest_products', [], [
+        'id' => $secondId,
+        'title' => 'Second',
+        'display_order' => 4,
+    ]);
+    homepageSection('random_categories', [], [
+        'id' => $firstId,
+        'title' => 'First',
+        'display_order' => 4,
+    ]);
+
+    $this->getJson('/api/v1/storefronts/fragrances/homepage')
+        ->assertOk()
+        ->assertJsonPath('data.sections.0.id', $firstId)
+        ->assertJsonPath('data.sections.1.id', $secondId);
+});
+
+it('hydrates split image banners with sorted desktop sides and one mobile image', function () {
+    Storage::fake(config('media-library.disk_name'));
+    $sectionId = homepageSection('split_image_banner', [
+        'items' => [
+            [
+                'slot' => 'right',
+                'description' => 'Warm scents for evenings.',
+                'cta_label' => 'Shop warm',
+                'cta_url' => null,
+                'sort_order' => 20,
+            ],
+            [
+                'slot' => 'left',
+                'description' => 'Fresh scents for every day.',
+                'cta_label' => 'Shop fresh',
+                'cta_url' => '/collections/fresh',
+                'sort_order' => 10,
+            ],
+            'not-an-item',
+            ['slot' => 'middle', 'description' => 'Invalid slot', 'sort_order' => 30],
+            ['slot' => 'left', 'description' => '', 'sort_order' => 40],
+            ['slot' => 'right', 'description' => ['invalid'], 'sort_order' => 50],
+            ['slot' => 'right', 'description' => 'Missing order'],
+        ],
+    ]);
+
+    $section = StorefrontHomepageSection::findOrFail($sectionId);
+    $section->addMedia(UploadedFile::fake()->image('left.jpg'))->toMediaCollection('left-image');
+    $section->addMedia(UploadedFile::fake()->image('right.jpg'))->toMediaCollection('right-image');
+    $section->addMedia(UploadedFile::fake()->image('mobile.jpg'))->toMediaCollection('mobile-image');
+
+    $response = $this->getJson('/api/v1/storefronts/fragrances/homepage')->assertOk();
+
+    $response->assertJsonPath('data.sections.0.type', 'split_image_banner')
+        ->assertJsonCount(2, 'data.sections.0.items')
+        ->assertJsonPath('data.sections.0.items.0.slot', 'left')
+        ->assertJsonPath('data.sections.0.items.0.sort_order', 10)
+        ->assertJsonPath('data.sections.0.items.0.cta.label', 'Shop fresh')
+        ->assertJsonPath('data.sections.0.items.0.cta.url', '/collections/fresh')
+        ->assertJsonPath('data.sections.0.items.1.slot', 'right')
+        ->assertJsonPath('data.sections.0.items.1.cta', null);
+
+    expect($section->fresh()->getFirstMedia('left-image')?->file_name)->toBe('left.jpg')
+        ->and($section->fresh()->getFirstMedia('right-image')?->file_name)->toBe('right.jpg')
+        ->and($section->fresh()->getFirstMedia('mobile-image')?->file_name)->toBe('mobile.jpg')
+        ->and($response->json('data.sections.0.items.0.image'))->toContain('left.jpg')
+        ->and($response->json('data.sections.0.items.1.image'))->toContain('right.jpg')
+        ->and($response->json('data.sections.0.mobile_image'))->toContain('mobile.jpg');
+});
+
+it('hydrates featured category collection newest and manual product sections', function () {
+    $root = DB::table('categories')->where('slug', 'fragrances')->value('id');
+    $child = homepageCategory('Perfume Oils', 'perfume-oils', $root);
+    $featured = homepageProduct('Featured', $child, ['is_featured' => true, 'sort_order' => 2]);
+    $newest = homepageProduct('Newest', $child, ['created_at' => now()->addMinute()]);
+    $outside = homepageCategory('Hair', 'hair');
+    homepageProduct('Outside', $outside, ['is_featured' => true]);
+
+    $collectionId = (string) Str::ulid();
+    DB::table('collections')->insert(['id' => $collectionId, 'name' => 'Midnight', 'slug' => 'midnight', 'is_active' => true, 'created_at' => now(), 'updated_at' => now()]);
+    DB::table('collection_product')->insert([
+        ['collection_id' => $collectionId, 'product_id' => $newest, 'sort_order' => 1],
+        ['collection_id' => $collectionId, 'product_id' => $featured, 'sort_order' => 2],
+    ]);
+
+    homepageSection('featured_products', ['sort' => 'name', 'direction' => 'asc'], ['display_order' => 1]);
+    homepageSection('category_products', ['category_slug' => 'perfume-oils'], ['display_order' => 2]);
+    homepageSection('collection_products', ['collection_slug' => 'midnight'], ['display_order' => 3]);
+    homepageSection('newest_products', ['limit' => 1], ['display_order' => 4]);
+    $manual = homepageSection('manual_products', ['limit' => 3], ['display_order' => 5]);
+    DB::table('storefront_homepage_section_product')->insert([
+        ['section_id' => $manual, 'product_id' => $newest, 'display_order' => 1],
+        ['section_id' => $manual, 'product_id' => 'missing-product', 'display_order' => 2],
+        ['section_id' => $manual, 'product_id' => $featured, 'display_order' => 3],
+    ]);
+
+    $response = $this->getJson('/api/v1/storefronts/fragrances/homepage')->assertOk();
+    expect($response->json('data.sections.0.items.*.name'))->toBe(['Featured']);
+    expect($response->json('data.sections.1.items.*.name'))->toContain('Featured', 'Newest');
+    expect($response->json('data.sections.2.items.*.name'))->toBe(['Newest', 'Featured']);
+    expect($response->json('data.sections.3.items.*.name'))->toBe(['Newest']);
+    expect($response->json('data.sections.4.items.*.name'))->toBe(['Newest', 'Featured']);
+});
+
+it('excludes soft-deleted products from homepage sections and category counts', function () {
+    $root = DB::table('categories')->where('slug', 'fragrances')->value('id');
+    $child = homepageCategory('Perfume Oils', 'perfume-oils', $root);
+
+    homepageProduct('Visible Perfume', $child, ['is_featured' => true]);
+    homepageProduct('Deleted Perfume', $child, [
+        'is_featured' => true,
+        'deleted_at' => now(),
+    ]);
+
+    homepageSection('featured_products', [], ['display_order' => 1]);
+    homepageSection('random_categories', [], ['display_order' => 2]);
+
+    $response = $this->getJson('/api/v1/storefronts/fragrances/homepage')->assertOk();
+
+    expect($response->json('data.sections.0.items.*.name'))->toBe(['Visible Perfume'])
+        ->and($response->json('data.sections.1.items.0.product_count'))->toBe(1);
+});
+
+it('returns only valid available sales with simple and default variant prices', function () {
+    $root = DB::table('categories')->where('slug', 'fragrances')->value('id');
+    $simple = homepageProduct('Simple Sale', $root, [
+        'price' => 10000,
+        'sale_price' => 8000,
+        'sale_starts_at' => now()->subDay(),
+        'sale_ends_at' => now()->addDay(),
+    ]);
+    $variable = homepageProduct('Variable Sale', $root, ['type' => 'variable', 'price' => 99999]);
+    homepageVariant($variable, ['price' => 12000, 'sale_price' => 9000, 'sale_starts_at' => now()->subDay(), 'sale_ends_at' => now()->addDay()]);
+    homepageProduct('Invalid Sale', $root, ['price' => 10000, 'sale_price' => 11000, 'sale_starts_at' => now()->subDay(), 'sale_ends_at' => now()->addDay()]);
+    homepageProduct('Unavailable Sale', $root, ['price' => 10000, 'sale_price' => 8000, 'sale_starts_at' => now()->subDay(), 'sale_ends_at' => now()->addDay(), 'manage_stock' => true, 'stock_quantity' => 0]);
+    homepageSection('sale_products');
+
+    $items = $this->getJson('/api/v1/storefronts/fragrances/homepage')->assertOk()->json('data.sections.0.items');
+    expect(array_column($items, 'id'))->toContain($simple, $variable)->toHaveCount(2);
+    expect(collect($items)->firstWhere('id', $simple))->toMatchArray(['price' => 10000, 'salePrice' => 8000, 'currentPrice' => 8000, 'isOnSale' => true]);
+    expect(collect($items)->firstWhere('id', $variable))->toMatchArray(['price' => 12000, 'salePrice' => 9000, 'currentPrice' => 9000, 'isOnSale' => true]);
+});
+
+it('returns cached stable random categories with product counts and storefront isolation', function () {
+    $fragrances = DB::table('categories')->where('slug', 'fragrances')->value('id');
+    foreach (['Oils', 'Sprays', 'Mists', 'Candles', 'Diffusers', 'Incense'] as $index => $name) {
+        $category = homepageCategory($name, Str::slug($name), $fragrances);
+        if ($index < 4) {
+            homepageProduct("{$name} Product", $category);
+        }
+    }
+    homepageSection('random_categories', ['limit' => 4, 'require_products' => true]);
+
+    $first = $this->getJson('/api/v1/storefronts/fragrances/homepage')->assertOk()->json('data.sections.0.items');
+    DB::table('storefront_homepage_sections')->where('storefront_slug', 'fragrances')->delete();
+    $second = $this->getJson('/api/v1/storefronts/fragrances/homepage')->assertOk()->json('data.sections.0.items');
+    expect($second)->toBe($first)->and($first)->toHaveCount(6);
+    expect(array_column($first, 'product_count'))->toBe([1, 1, 1, 1, 0, 0]);
+
+    homepageCategory('Beauty', 'beauty');
+    $this->getJson('/api/v1/storefronts/beauty/homepage')->assertOk()->assertJsonCount(0, 'data.sections');
+});
+
+it('contains malformed known sections and omits unsupported types without failing the homepage', function () {
+    homepageSection('category_products', ['category_slug' => '../unsafe']);
+    homepageSection('collection_products', ['collection_slug' => 'missing'], ['display_order' => 2]);
+    homepageSection('arbitrary_php_class', [], ['display_order' => 3]);
+
+    $this->getJson('/api/v1/storefronts/fragrances/homepage')
+        ->assertOk()
+        ->assertJsonCount(2, 'data.sections')
+        ->assertJsonCount(0, 'data.sections.0.items')
+        ->assertJsonCount(0, 'data.sections.1.items');
+});
+
+it('enforces item limits and sort allowlists', function () {
+    $root = DB::table('categories')->where('slug', 'fragrances')->value('id');
+    foreach (['Zulu', 'Alpha', 'Mike', 'Bravo'] as $index => $name) {
+        homepageProduct($name, $root, ['is_featured' => true, 'sort_order' => $index]);
+    }
+    homepageSection('featured_products', ['limit' => 999, 'sort' => 'id; DROP TABLE products', 'direction' => 'sideways']);
+
+    $items = $this->getJson('/api/v1/storefronts/fragrances/homepage')->assertOk()->json('data.sections.0.items');
+    expect($items)->toHaveCount(3)
+        ->and(array_column($items, 'name'))->toBe(['Zulu', 'Alpha', 'Mike'])
+        ->and(Schema::hasTable('products'))->toBeTrue();
+});
+
+it('limits every homepage product section to four products', function () {
+    config()->set('storefront.homepage.max_item_limit', 20);
+    config()->set('storefront.homepage.max_product_limit', 4);
+    $root = DB::table('categories')->where('slug', 'fragrances')->value('id');
+
+    foreach (range(1, 6) as $number) {
+        homepageProduct("Featured {$number}", $root, ['is_featured' => true]);
+    }
+
+    homepageSection('featured_products', ['limit' => 20]);
+
+    $this->getJson('/api/v1/storefronts/fragrances/homepage')
+        ->assertOk()
+        ->assertJsonCount(4, 'data.sections.0.items');
+});
+
+it('hydrates products without per-product query growth', function () {
+    config()->set('storefront.homepage.cache_ttl', 0);
+    config()->set('storefront.homepage.max_item_limit', 20);
+    $root = DB::table('categories')->where('slug', 'fragrances')->value('id');
+    homepageSection('featured_products', ['limit' => 20]);
+    homepageProduct('One', $root, ['is_featured' => true]);
+
+    $queries = 0;
+    DB::listen(function () use (&$queries): void {
+        $queries++;
+    });
+    $this->getJson('/api/v1/storefronts/fragrances/homepage')->assertOk();
+    $single = $queries;
+
+    foreach (range(2, 10) as $number) {
+        homepageProduct("Product {$number}", $root, ['is_featured' => true]);
+    }
+    $queries = 0;
+    $this->getJson('/api/v1/storefronts/fragrances/homepage')->assertOk();
+
+    expect($queries)->toBeLessThanOrEqual($single + 1);
+});

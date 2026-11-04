@@ -1,7 +1,7 @@
 <?php
 
-use App\Features\Product\Queries\GetProductQuery;
-use App\Features\Product\Queries\ListProductsQuery;
+use App\Domain\Catalog\Product\Queries\GetProductQuery;
+use App\Domain\Catalog\Product\Queries\ListProductsQuery;
 use App\Infrastructure\Persistence\Eloquent\Models\Product;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
@@ -60,7 +60,7 @@ it('uses fresh cache keys and product tags for catalog reads', function () {
     );
     $detail = new GetProductQuery('deleted-product');
 
-    expect($list->cacheKey())->toStartWith('catalog:products:v2:')
+    expect($list->cacheKey())->toStartWith('catalog:products:v3:')
         ->and($detail->cacheKey())->toStartWith('catalog:product:v2:')
         ->and($detail->cacheTags())->toBe(['catalog', 'products']);
 });

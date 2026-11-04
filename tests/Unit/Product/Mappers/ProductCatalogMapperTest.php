@@ -6,10 +6,10 @@
  */
 
 
-use App\Features\Brand\DTOs\BrandDto;
-use App\Features\Category\DTOs\CategoryDto;
-use App\Features\Product\DTOs\ProductCatalogDto;
-use App\Features\Product\Mappers\ProductCatalogMapper;
+use App\Domain\Catalog\Brand\DTOs\BrandDto;
+use App\Domain\Catalog\Category\DTOs\CategoryDto;
+use App\Domain\Catalog\Product\DTOs\ProductCatalogDto;
+use App\Domain\Catalog\Product\Mappers\ProductCatalogMapper;
 use App\Shared\DTOs\PriceDto;
 use Tests\Support\Factories\{BrandFactory, CategoryFactory, ProductFactory, ProductVariantFactory};
 

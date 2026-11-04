@@ -2,13 +2,57 @@
 
 namespace App\Providers;
 
-use App\Features\Brand\Contracts\BrandRepository;
-use App\Features\Category\Contracts\CategoryRepository;
-use App\Features\Product\Contracts\ProductRepository;
-use App\Infrastructure\Persistence\Eloquent\EloquentBrandRepository;
-use App\Infrastructure\Persistence\Eloquent\EloquentCategoryRepository;
-use App\Infrastructure\Persistence\Eloquent\EloquentProductRepository;
+use App\Domain\Catalog\Brand\Contracts\BrandRepository;
+use App\Domain\Catalog\Cart\Contracts\CartRepository;
+use App\Domain\Catalog\Category\Contracts\CategoryRepository;
+use App\Domain\Catalog\Product\Contracts\ProductRepository;
+use App\Domain\Catalog\SavedItem\Contracts\SavedItemRepository;
+use App\Domain\Catalog\Storefront\StorefrontContext;
+use App\Domain\Order\Contracts\CheckoutRepository;
+use App\Domain\Order\Contracts\OrderRepository;
+use App\Domain\Payment\Contracts\PaymentMethodRepository;
+use App\Domain\Payment\Contracts\PaymentRepository;
+use App\Domain\Shipping\Contracts\ShippingRepository;
+use App\Domain\User\Contracts\AddressRepository;
+use App\Domain\User\Contracts\SocialAccountRepository;
+use App\Domain\User\Contracts\UserRepository;
+use App\Infrastructure\CacheMetrics\RegisterCacheMetricsListeners;
+use App\Infrastructure\Caching\CacheInvalidationObserver;
+use App\Infrastructure\Persistence\Eloquent\Models\AttributeType;
+use App\Infrastructure\Persistence\Eloquent\Models\Brand;
+use App\Infrastructure\Persistence\Eloquent\Models\Category;
+use App\Infrastructure\Persistence\Eloquent\Models\CollectionProduct;
+use App\Infrastructure\Persistence\Eloquent\Models\ContentPage;
+use App\Infrastructure\Persistence\Eloquent\Models\PaymentMethod;
+use App\Infrastructure\Persistence\Eloquent\Models\Product;
+use App\Infrastructure\Persistence\Eloquent\Models\ProductAttribute;
+use App\Infrastructure\Persistence\Eloquent\Models\ProductCollection;
+use App\Infrastructure\Persistence\Eloquent\Models\ProductVariant;
+use App\Infrastructure\Persistence\Eloquent\Models\ShippingMethod;
+use App\Infrastructure\Persistence\Eloquent\Models\ShippingRate;
+use App\Infrastructure\Persistence\Eloquent\Models\ShippingZone;
+use App\Infrastructure\Persistence\Eloquent\Models\ShippingZoneLocation;
+use App\Infrastructure\Persistence\Eloquent\Models\StorefrontCampaign;
+use App\Infrastructure\Persistence\Eloquent\Models\StorefrontHomepageSection;
+use App\Infrastructure\Persistence\Eloquent\Models\StorefrontHomepageSectionProduct;
+use App\Infrastructure\Persistence\Eloquent\Models\User;
+use App\Infrastructure\Persistence\Eloquent\Repositories\EloquentAddressRepository;
+use App\Infrastructure\Persistence\Eloquent\Repositories\EloquentBrandRepository;
+use App\Infrastructure\Persistence\Eloquent\Repositories\EloquentCartRepository;
+use App\Infrastructure\Persistence\Eloquent\Repositories\EloquentCategoryRepository;
+use App\Infrastructure\Persistence\Eloquent\Repositories\EloquentCheckoutRepository;
+use App\Infrastructure\Persistence\Eloquent\Repositories\EloquentOrderRepository;
+use App\Infrastructure\Persistence\Eloquent\Repositories\EloquentPaymentMethodRepository;
+use App\Infrastructure\Persistence\Eloquent\Repositories\EloquentPaymentRepository;
+use App\Infrastructure\Persistence\Eloquent\Repositories\EloquentProductRepository;
+use App\Infrastructure\Persistence\Eloquent\Repositories\EloquentSavedItemRepository;
+use App\Infrastructure\Persistence\Eloquent\Repositories\EloquentShippingRepository;
+use App\Infrastructure\Persistence\Eloquent\Repositories\EloquentSocialAccountRepository;
+use App\Infrastructure\Persistence\Eloquent\Repositories\EloquentUserRepository;
+use App\Infrastructure\Settings\GoogleCredentialsConfigurator;
+use Illuminate\Database\Eloquent\Relations\Relation;
 use Illuminate\Support\ServiceProvider;
+use Spatie\MediaLibrary\MediaCollections\Models\Media;
 
 class AppServiceProvider extends ServiceProvider
 {
@@ -17,6 +61,8 @@ class AppServiceProvider extends ServiceProvider
      */
     public function register(): void
     {
+        $this->app->scoped(StorefrontContext::class, fn () => new StorefrontContext);
+
         $this->app->bind(
             ProductRepository::class,
             EloquentProductRepository::class,
@@ -30,13 +76,97 @@ class AppServiceProvider extends ServiceProvider
             BrandRepository::class,
             EloquentBrandRepository::class,
         );
+
+        $this->app->bind(
+            UserRepository::class,
+            EloquentUserRepository::class,
+        );
+
+        $this->app->bind(
+            SocialAccountRepository::class,
+            EloquentSocialAccountRepository::class,
+        );
+
+        $this->app->bind(
+            SavedItemRepository::class,
+            EloquentSavedItemRepository::class,
+        );
+
+        $this->app->bind(
+            CartRepository::class,
+            EloquentCartRepository::class,
+        );
+
+        $this->app->bind(
+            AddressRepository::class,
+            EloquentAddressRepository::class,
+        );
+
+        $this->app->bind(
+            ShippingRepository::class,
+            EloquentShippingRepository::class,
+        );
+
+        $this->app->bind(
+            CheckoutRepository::class,
+            EloquentCheckoutRepository::class,
+        );
+
+        $this->app->bind(
+            OrderRepository::class,
+            EloquentOrderRepository::class,
+        );
+
+        $this->app->bind(
+            PaymentMethodRepository::class,
+            EloquentPaymentMethodRepository::class,
+        );
+
+        $this->app->bind(
+            PaymentRepository::class,
+            EloquentPaymentRepository::class,
+        );
     }
 
     /**
      * Bootstrap any application services.
      */
-    public function boot(): void
+    public function boot(GoogleCredentialsConfigurator $googleCredentials): void
     {
-        //
+        $googleCredentials->apply();
+        app(RegisterCacheMetricsListeners::class)->register();
+
+        Relation::enforceMorphMap([
+            'category' => Category::class,
+            'product' => Product::class,
+            'product_variant' => ProductVariant::class,
+            'storefront_campaign' => StorefrontCampaign::class,
+            'storefront_homepage_section' => StorefrontHomepageSection::class,
+            'content_page' => ContentPage::class,
+            'user' => User::class,
+        ]);
+
+        foreach ([
+            Product::class,
+            ProductVariant::class,
+            ProductAttribute::class,
+            AttributeType::class,
+            Category::class,
+            Brand::class,
+            ProductCollection::class,
+            CollectionProduct::class,
+            StorefrontCampaign::class,
+            StorefrontHomepageSection::class,
+            StorefrontHomepageSectionProduct::class,
+            PaymentMethod::class,
+            ShippingMethod::class,
+            ShippingRate::class,
+            ShippingZone::class,
+            ShippingZoneLocation::class,
+            Media::class,
+        ] as $model) {
+            $model::observe(CacheInvalidationObserver::class);
+        }
+
     }
 }

@@ -12,143 +12,295 @@
         }
     ],
     "paths": {
-        "/api/categories": {
+        "/api/v1/storefronts/{storefront}/pages/{slug}": {
             "get": {
                 "tags": [
-                    "Categories"
+                    "Public Content"
                 ],
-                "summary": "Get categories",
-                "operationId": "9ccff7aa6acc1f3079a6b0e0b6463e69",
+                "summary": "Get a published storefront page",
+                "operationId": "674d830941507f1b68f3dc2fb16be80e",
                 "parameters": [
                     {
-                        "name": "parent",
-                        "in": "query",
-                        "required": false,
+                        "name": "storefront",
+                        "in": "path",
+                        "required": true,
                         "schema": {
-                            "type": "string"
+                            "type": "string",
+                            "example": "fragrances"
                         }
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "Paginated category list",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/Categories"
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        },
-        "/api/categories/{slug}": {
-            "get": {
-                "tags": [
-                    "Categories"
-                ],
-                "summary": "Get category details",
-                "operationId": "54a7c38ac5f993fe556805bb92d21e39",
-                "parameters": [
+                    },
                     {
                         "name": "slug",
                         "in": "path",
                         "required": true,
                         "schema": {
-                            "type": "string"
+                            "type": "string",
+                            "example": "about"
                         }
                     }
                 ],
                 "responses": {
                     "200": {
-                        "description": "Category details",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/Categories"
-                                }
-                            }
-                        }
+                        "description": "Published page"
+                    },
+                    "404": {
+                        "description": "Storefront or page unavailable"
                     }
                 }
             }
         },
-        "/api/products": {
+        "/api/v1/storefronts/{storefront}/faqs": {
             "get": {
                 "tags": [
-                    "Products"
+                    "Public Content"
                 ],
-                "summary": "Get products",
-                "operationId": "4a0a1a1c6d1ef74a8b91ec82b2d99934",
+                "summary": "List published storefront FAQs",
+                "operationId": "1d58a84a2ece61f6b26629d6c428c284",
                 "parameters": [
+                    {
+                        "name": "storefront",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "example": "fragrances"
+                        }
+                    },
                     {
                         "name": "category",
                         "in": "query",
-                        "required": false,
                         "schema": {
                             "type": "string"
                         }
                     },
                     {
-                        "name": "brand",
+                        "name": "search",
                         "in": "query",
-                        "required": false,
                         "schema": {
                             "type": "string"
                         }
                     },
                     {
-                        "name": "filters[search][$contains]",
+                        "name": "page",
                         "in": "query",
-                        "description": "Search products by name or slug",
-                        "required": false,
                         "schema": {
-                            "type": "string"
+                            "type": "integer",
+                            "minimum": 1
+                        }
+                    },
+                    {
+                        "name": "per_page",
+                        "in": "query",
+                        "schema": {
+                            "type": "integer",
+                            "maximum": 50,
+                            "minimum": 1
                         }
                     }
                 ],
                 "responses": {
                     "200": {
-                        "description": "Paginated product catalog list",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/ProductCatalogResponse"
-                                }
-                            }
-                        }
+                        "description": "Grouped FAQ results"
+                    },
+                    "404": {
+                        "description": "Storefront unavailable"
+                    },
+                    "422": {
+                        "description": "Invalid filter"
                     }
                 }
             }
         },
-        "/api/product/{slug}": {
-            "get": {
+        "/api/v1/storefronts/{storefront}/contact-submissions": {
+            "post": {
                 "tags": [
-                    "Products"
+                    "Contact"
                 ],
-                "summary": "Get product details",
-                "operationId": "43a99e990fc3434d25e71111598956f0",
+                "summary": "Submit a public contact message",
+                "operationId": "2559c00f8be76b102e8e9f661a10496a",
                 "parameters": [
                     {
-                        "name": "slug",
+                        "name": "storefront",
                         "in": "path",
                         "required": true,
                         "schema": {
-                            "type": "string"
+                            "type": "string",
+                            "example": "fragrances"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "required": [
+                                    "name",
+                                    "email",
+                                    "message"
+                                ],
+                                "properties": {
+                                    "name": {
+                                        "type": "string",
+                                        "maxLength": 150
+                                    },
+                                    "email": {
+                                        "type": "string",
+                                        "format": "email"
+                                    },
+                                    "phone": {
+                                        "type": "string",
+                                        "nullable": true
+                                    },
+                                    "subject": {
+                                        "type": "string",
+                                        "nullable": true
+                                    },
+                                    "message": {
+                                        "type": "string",
+                                        "maxLength": 5000,
+                                        "minLength": 10
+                                    },
+                                    "source": {
+                                        "type": "string",
+                                        "example": "contact-page",
+                                        "nullable": true
+                                    },
+                                    "website": {
+                                        "description": "Honeypot; leave empty",
+                                        "type": "string"
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "202": {
+                        "description": "Message accepted; response contains only a reference"
+                    },
+                    "404": {
+                        "description": "Storefront unavailable"
+                    },
+                    "422": {
+                        "description": "Invalid message"
+                    },
+                    "429": {
+                        "description": "Rate limit exceeded"
+                    }
+                }
+            }
+        },
+        "/api/v1/storefronts/{storefront}/homepage": {
+            "get": {
+                "tags": [
+                    "Storefront"
+                ],
+                "summary": "Get the fully hydrated public storefront homepage",
+                "operationId": "getStorefrontHomepage",
+                "parameters": [
+                    {
+                        "name": "storefront",
+                        "in": "path",
+                        "description": "Active root-category storefront slug",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "example": "fragrances"
                         }
                     }
                 ],
                 "responses": {
                     "200": {
-                        "description": "Product details",
+                        "description": "Published homepage content. Campaign is nullable and sections may be empty.",
                         "content": {
                             "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/ProductDetail"
+                                "schema": {},
+                                "example": {
+                                    "success": true,
+                                    "message": "Success",
+                                    "data": {
+                                        "storefront": {
+                                            "slug": "fragrances",
+                                            "name": "Fragrances",
+                                            "announcement": {
+                                                "primary_text": "Free Lagos delivery on orders over ₦100,000",
+                                                "secondary_text": "Complimentary scent consultation"
+                                            }
+                                        },
+                                        "campaign": {
+                                            "id": "01K1ABCDEF1234567890ABCDEF",
+                                            "eyebrow": "After-dark fragrances",
+                                            "title": "Leave a trace.",
+                                            "description": "A magnetic collection for after dark.",
+                                            "desktop_image": "https://cdn.example.com/campaign-desktop.webp",
+                                            "mobile_image": "https://cdn.example.com/campaign-mobile.webp",
+                                            "cta_label": "Shop the campaign",
+                                            "cta_url": "/collections/midnight-edit",
+                                            "starts_at": "2026-08-01T00:00:00.000000Z",
+                                            "ends_at": null
+                                        },
+                                        "sections": [
+                                            {
+                                                "id": "01K1ABCDEF1234567890ABCDEG",
+                                                "type": "featured_products",
+                                                "title": "Currently coveted",
+                                                "subtitle": null,
+                                                "display_order": 1,
+                                                "items": []
+                                            }
+                                        ]
+                                    }
                                 }
                             }
                         }
+                    },
+                    "404": {
+                        "description": "Unknown, inactive, or non-root storefront"
+                    }
+                }
+            }
+        },
+        "/api/v1/storefronts/{storefront}/configuration": {
+            "get": {
+                "tags": [
+                    "Storefront"
+                ],
+                "summary": "Get public storefront-wide presentation settings",
+                "operationId": "getStorefrontConfiguration",
+                "parameters": [
+                    {
+                        "name": "storefront",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "example": "fragrances"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Public storefront presentation settings.",
+                        "content": {
+                            "application/json": {
+                                "schema": {},
+                                "example": {
+                                    "success": true,
+                                    "message": "Success",
+                                    "data": {
+                                        "announcement": {
+                                            "primary_text": "Free Lagos delivery on orders over ₦100,000",
+                                            "secondary_text": "Complimentary scent consultation"
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Unknown or inactive storefront."
                     }
                 }
             }
@@ -169,6 +321,30 @@
                     "slug": {
                         "type": "string",
                         "example": "st-ives"
+                    },
+                    "description": {
+                        "type": "string",
+                        "example": "A long lipsium ipsium description",
+                        "nullable": true
+                    },
+                    "metaTitle": {
+                        "type": "string",
+                        "example": "A long lipsium ipsium description",
+                        "nullable": true
+                    },
+                    "metaDescription": {
+                        "type": "string",
+                        "example": "A long lipsium ipsium description",
+                        "nullable": true
+                    },
+                    "sortOrder": {
+                        "type": "integer",
+                        "example": 4,
+                        "nullable": true
+                    },
+                    "isActive": {
+                        "type": "boolean",
+                        "example": true
                     }
                 },
                 "type": "object"
@@ -237,8 +413,7 @@
                 },
                 "type": "object"
             },
-            "ProductCatalog": {
-                "title": "Product Catalog",
+            "vendors": {
                 "properties": {
                     "id": {
                         "type": "string",
@@ -246,197 +421,11 @@
                     },
                     "name": {
                         "type": "string",
-                        "example": "Face Scrub"
+                        "example": "Skin Care"
                     },
-                    "slug": {
+                    "business_name": {
                         "type": "string",
-                        "example": "face-scrub",
-                        "nullable": true
-                    },
-                    "category": {
-                        "$ref": "#/components/schemas/Categories"
-                    },
-                    "brand": {
-                        "$ref": "#/components/schemas/Brands"
-                    },
-                    "shortDescription": {
-                        "type": "string",
-                        "example": "Facial scrub lemon fragrance ",
-                        "nullable": true
-                    },
-                    "description": {
-                        "type": "string",
-                        "example": "Facial scrub lemon fragrance with very much more additional info",
-                        "nullable": true
-                    },
-                    "type": {
-                        "example": "variant"
-                    },
-                    "metaTitle": {
-                        "type": "string",
-                        "example": "Facial scrub lemon fragrance",
-                        "nullable": true
-                    },
-                    "metaDescription": {
-                        "type": "string",
-                        "example": "Facial scrub lemon fragrance with very much more additional info",
-                        "nullable": true
-                    },
-                    "isFeatured": {
-                        "type": "boolean",
-                        "example": "true"
-                    },
-                    "price": {
-                        "$ref": "#/components/schemas/Price"
-                    }
-                },
-                "type": "object"
-            },
-            "ProductCatalogFilters": {
-                "properties": {
-                    "search": {
-                        "description": "Search across product name and slug",
-                        "type": "string",
-                        "example": "bathing salts",
-                        "nullable": true
-                    }
-                },
-                "type": "object"
-            },
-            "ProductCatalogResponse": {
-                "properties": {
-                    "data": {
-                        "type": "array",
-                        "items": {
-                            "$ref": "#/components/schemas/ProductCatalog"
-                        }
-                    },
-                    "meta": {
-                        "$ref": "#/components/schemas/PaginationMeta"
-                    }
-                },
-                "type": "object"
-            },
-            "ProductDetail": {
-                "title": "Product Detail",
-                "properties": {
-                    "id": {
-                        "type": "string",
-                        "example": "01J2P9WQZ3YJ6R8X9A2C4D5E6F"
-                    },
-                    "name": {
-                        "type": "string",
-                        "example": "Face Scrub"
-                    },
-                    "slug": {
-                        "type": "string",
-                        "example": "face-scrub"
-                    },
-                    "category": {
-                        "$ref": "#/components/schemas/Categories"
-                    },
-                    "brand": {
-                        "$ref": "#/components/schemas/Brands"
-                    },
-                    "shortDescription": {
-                        "type": "string",
-                        "example": "Facial scrub lemon fragrance ",
-                        "nullable": true
-                    },
-                    "description": {
-                        "type": "string",
-                        "example": "Facial scrub lemon fragrance with very much more additional info",
-                        "nullable": true
-                    },
-                    "type": {
-                        "example": "variant"
-                    },
-                    "status": {
-                        "example": "published"
-                    },
-                    "metaTitle": {
-                        "type": "string",
-                        "example": "facial scrub",
-                        "nullable": true
-                    },
-                    "metaDescription": {
-                        "type": "string",
-                        "example": "very long facial scrub",
-                        "nullable": true
-                    },
-                    "isFeatured": {
-                        "type": "boolean",
-                        "example": "false"
-                    },
-                    "variants": {
-                        "$ref": "#/components/schemas/Variants"
-                    },
-                    "price": {
-                        "$ref": "#/components/schemas/Price"
-                    }
-                },
-                "type": "object"
-            },
-            "Variants": {
-                "properties": {
-                    "id": {
-                        "type": "string",
-                        "example": "01J2P9WQZ3YJ6R8X9A2C4D5E6F"
-                    },
-                    "productId": {
-                        "type": "string",
-                        "example": "01J2P9WQZ3YJ6R8X9A2C4D5E6F"
-                    },
-                    "sku": {
-                        "type": "string",
-                        "example": "FACE-SCRUB-LEM-099009"
-                    },
-                    "isDefault": {
-                        "type": "boolean",
-                        "example": "false"
-                    },
-                    "price": {
-                        "$ref": "#/components/schemas/Price"
-                    },
-                    "salePrice": {
-                        "$ref": "#/components/schemas/Price"
-                    },
-                    "saleStartsAt": {
-                        "type": "string",
-                        "format": "date-time",
-                        "example": "2025-01-01T00:00:00.000000Z"
-                    },
-                    "saleEndsAt": {
-                        "type": "string",
-                        "format": "date-time",
-                        "example": "2025-03-01T00:00:00.000000Z"
-                    },
-                    "manageStock": {
-                        "type": "boolean",
-                        "example": true
-                    },
-                    "stockQuantity": {
-                        "type": "integer",
-                        "example": 10
-                    },
-                    "inStock": {
-                        "type": "boolean",
-                        "example": true
-                    },
-                    "attributes": {
-                        "type": "array",
-                        "items": {
-                            "type": "mixed"
-                        },
-                        "example": "[{'color': 'red', 'size': 'large'}]"
-                    },
-                    "sortOrder": {
-                        "type": "integer",
-                        "example": 1
-                    },
-                    "status": {
-                        "type": "string",
-                        "example": "active"
+                        "example": "Glow Enterprise"
                     }
                 },
                 "type": "object"
@@ -484,12 +473,16 @@
     },
     "tags": [
         {
-            "name": "Categories",
-            "description": "Categories"
+            "name": "Public Content",
+            "description": "Public Content"
         },
         {
-            "name": "Products",
-            "description": "Products"
+            "name": "Contact",
+            "description": "Contact"
+        },
+        {
+            "name": "Storefront",
+            "description": "Storefront"
         }
     ]
 }

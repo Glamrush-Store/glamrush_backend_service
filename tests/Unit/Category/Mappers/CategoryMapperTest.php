@@ -1,8 +1,8 @@
 <?php
 
-use App\Features\Category\DTOs\CategoryDto;
-use App\Features\Category\DTOs\CategoryParentDto;
-use App\Features\Category\Mappers\CategoryDtoMapper;
+use App\Domain\Catalog\Category\DTOs\CategoryDto;
+use App\Domain\Catalog\Category\DTOs\CategoryParentDto;
+use App\Domain\Catalog\Category\Mappers\CategoryDtoMapper;
 use Tests\Support\Factories\CategoryFactory;
 
 it('maps category model to category dto correctly', function () {
