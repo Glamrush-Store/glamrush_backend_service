@@ -8,6 +8,7 @@ use App\Infrastructure\Persistence\Eloquent\Models\CartItem;
 use App\Infrastructure\Persistence\Eloquent\Models\DiscountCode;
 use App\Infrastructure\Persistence\Eloquent\Models\DiscountRedemption;
 use App\Infrastructure\Persistence\Eloquent\Models\Order;
+use App\Infrastructure\Persistence\Eloquent\Scopes\PublishedScope;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\DB;
 use RuntimeException;
@@ -25,12 +26,12 @@ final class DiscountService
     ): array {
         $items = CartItem::query()
             ->with([
-                'product' => fn ($query) => $query->withoutGlobalScopes()->with(['collections', 'categories', 'primaryCategory']),
+                'product' => fn ($query) => $query->withoutGlobalScope(PublishedScope::class)->with(['collections', 'categories', 'primaryCategory']),
                 'product.defaultVariant',
                 'variant',
             ])
             ->tap(fn (Builder $query) => $this->constrainCart($query, $cartIdentifier))
-            ->whereHas('product', fn (Builder $query) => $query->withoutGlobalScopes()
+            ->whereHas('product', fn (Builder $query) => $query->withoutGlobalScope(PublishedScope::class)
                 ->whereHas('categories', fn (Builder $categoryQuery) => $categoryQuery->whereIn('categories.id', $this->storefrontContext->categoryIds())))
             ->get();
 
@@ -242,13 +243,16 @@ final class DiscountService
     private function categoryLineage(string $categoryId): array
     {
         static $cache = [];
-        if (isset($cache[$categoryId])) return $cache[$categoryId];
+        if (isset($cache[$categoryId])) {
+            return $cache[$categoryId];
+        }
         $ids = [];
         $current = $categoryId;
         while ($current !== null) {
             $ids[] = $current;
             $current = DB::table('categories')->where('id', $current)->value('parent_id');
         }
+
         return $cache[$categoryId] = $ids;
     }
 
@@ -263,13 +267,17 @@ final class DiscountService
             $result[$index] = $this->fromCents($amount);
             $remaining -= $amount;
         }
+
         return $result;
     }
 
     private function customerKey(?int $userId, ?string $email): ?string
     {
-        if ($userId !== null) return 'user:'.$userId;
+        if ($userId !== null) {
+            return 'user:'.$userId;
+        }
         $email = strtolower(trim((string) $email));
+
         return $email === '' ? null : 'email:'.hash('sha256', $email);
     }
 
@@ -290,7 +298,13 @@ final class DiscountService
             && ($variant->sale_ends_at === null || now()->lessThanOrEqualTo($variant->sale_ends_at));
     }
 
-    private function toCents(mixed $amount): int { return (int) round((float) $amount * 100); }
-    private function fromCents(int $amount): float { return $amount / 100; }
-}
+    private function toCents(mixed $amount): int
+    {
+        return (int) round((float) $amount * 100);
+    }
 
+    private function fromCents(int $amount): float
+    {
+        return $amount / 100;
+    }
+}

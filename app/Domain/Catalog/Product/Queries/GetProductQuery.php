@@ -20,7 +20,7 @@ final class GetProductQuery implements CacheableQuery
 
     public function cacheKey(): string
     {
-        return 'products'.md5(json_encode([
+        return 'catalog:product:v2:'.md5(json_encode([
             'slug' => $this->slug,
             'storefrontRootSlug' => $this->storefrontRootSlug,
         ]));

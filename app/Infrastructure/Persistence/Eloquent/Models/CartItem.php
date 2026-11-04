@@ -3,6 +3,7 @@
 namespace App\Infrastructure\Persistence\Eloquent\Models;
 
 use App\Infrastructure\Persistence\Eloquent\Scopes\NotExpiredScope;
+use App\Infrastructure\Persistence\Eloquent\Scopes\PublishedScope;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
@@ -30,7 +31,7 @@ class CartItem extends Model
                 return;
             }
 
-            $product = Product::withoutGlobalScopes()->find($item->product_id);
+            $product = Product::withoutGlobalScope(PublishedScope::class)->find($item->product_id);
 
             if (! $product || $product->type !== 'simple') {
                 return;

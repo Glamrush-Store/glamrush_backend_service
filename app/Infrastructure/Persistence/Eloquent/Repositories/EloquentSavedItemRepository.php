@@ -15,8 +15,9 @@ final class EloquentSavedItemRepository implements SavedItemRepository
     {
         return SavedItem::with(['product', 'product.media'])
             ->where('user_id', $userId)
+            ->whereHas('product')
             ->get()
-            ->map(fn(SavedItem $item) => SavedItemMapper::toDomain($item));
+            ->map(fn (SavedItem $item) => SavedItemMapper::toDomain($item));
     }
 
     public function findForUser(int $userId, string $productId): ?SavedItemEntity
@@ -24,6 +25,7 @@ final class EloquentSavedItemRepository implements SavedItemRepository
         $item = SavedItem::with(['product', 'product.media'])
             ->where('user_id', $userId)
             ->where('product_id', $productId)
+            ->whereHas('product')
             ->first();
 
         return $item ? SavedItemMapper::toDomain($item) : null;
@@ -71,8 +73,8 @@ final class EloquentSavedItemRepository implements SavedItemRepository
         }
 
         $now = now();
-        $rows = array_map(fn(string $productId) => [
-            'user_id'    => $userId,
+        $rows = array_map(fn (string $productId) => [
+            'user_id' => $userId,
             'product_id' => $productId,
             'created_at' => $now,
             'updated_at' => $now,

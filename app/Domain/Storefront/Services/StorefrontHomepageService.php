@@ -41,7 +41,7 @@ final class StorefrontHomepageService
     public function get(string $storefront): array
     {
         $ttl = max(0, (int) config('storefront.homepage.cache_ttl', 300));
-        $key = "storefront:{$storefront}:homepage:v9";
+        $key = "storefront:{$storefront}:homepage:v10";
 
         if ($ttl === 0) {
             return $this->build($storefront);
@@ -49,7 +49,7 @@ final class StorefrontHomepageService
 
         return QueryCache::rememberTagged(
             $key,
-            [CacheTags::HOMEPAGE, CacheTags::STOREFRONTS],
+            [CacheTags::HOMEPAGE, CacheTags::STOREFRONTS, CacheTags::PRODUCTS],
             $ttl,
             fn (): array => $this->build($storefront),
         );
@@ -359,6 +359,7 @@ final class StorefrontHomepageService
         $productCounts = DB::table('category_product')
             ->join('products', 'products.id', '=', 'category_product.product_id')
             ->whereIn('category_product.category_id', $this->storefrontContext->categoryIds())
+            ->whereNull('products.deleted_at')
             ->selectRaw('category_product.category_id, COUNT(DISTINCT products.id) as aggregate')
             ->groupBy('category_product.category_id')
             ->pluck('aggregate', 'category_product.category_id');

@@ -14,6 +14,7 @@ use App\Infrastructure\Persistence\Eloquent\Scopes\PublishedScope;
 use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
+use Illuminate\Database\Eloquent\SoftDeletes;
 use Spatie\Image\Enums\Fit;
 use Spatie\MediaLibrary\HasMedia;
 use Spatie\MediaLibrary\InteractsWithMedia;
@@ -21,7 +22,7 @@ use Spatie\MediaLibrary\MediaCollections\Models\Media;
 
 class Product extends Model implements HasMedia
 {
-    use Filterable, HasUlids, InteractsWithMedia, Sortable;
+    use Filterable, HasUlids, InteractsWithMedia, SoftDeletes, Sortable;
 
     public $incrementing = false;
 
@@ -116,6 +117,7 @@ class Product extends Model implements HasMedia
 
         if ($this->relationLoaded('categories') && $this->categories->isNotEmpty()) {
             $primary = $this->categories->first(fn ($category) => (bool) ($category->pivot?->is_primary));
+
             return (string) ($primary?->id ?? $this->categories->first()->id);
         }
 
@@ -145,4 +147,3 @@ class Product extends Model implements HasMedia
             ->where('is_default', true);
     }
 }
-

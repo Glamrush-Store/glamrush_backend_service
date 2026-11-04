@@ -13,6 +13,7 @@ use App\Infrastructure\Persistence\Eloquent\Mappers\Catalog\CartItemMapper;
 use App\Infrastructure\Persistence\Eloquent\Models\CartItem;
 use App\Infrastructure\Persistence\Eloquent\Models\Product;
 use App\Infrastructure\Persistence\Eloquent\Models\ProductVariant;
+use App\Infrastructure\Persistence\Eloquent\Scopes\PublishedScope;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Support\Collection;
@@ -20,8 +21,6 @@ use Illuminate\Support\Facades\DB;
 
 final class EloquentCartRepository implements CartRepository
 {
-    private const ITEM_RELATIONS = ['product', 'product.media', 'product.categories', 'product.primaryCategory', 'variant', 'variant.media'];
-
     private const CART_TTL_DAYS = 7;
 
     public function __construct(
@@ -30,7 +29,8 @@ final class EloquentCartRepository implements CartRepository
 
     public function getItems(CartIdentifier $id): Collection
     {
-        return CartItem::with(self::ITEM_RELATIONS)
+        return CartItem::with($this->itemRelations())
+            ->whereHas('product', fn (Builder $query) => $query->withoutGlobalScope(PublishedScope::class))
             ->tap(fn (Builder $query) => $this->constrain($query, $id))
             ->tap(fn (Builder $query) => $this->constrainStorefront($query))
             ->get()
@@ -128,7 +128,8 @@ final class EloquentCartRepository implements CartRepository
     public function mergeGuestCart(int $userId, string $cartToken): void
     {
         DB::transaction(function () use ($userId, $cartToken): void {
-            $guestItems = CartItem::with(self::ITEM_RELATIONS)
+            $guestItems = CartItem::with($this->itemRelations())
+                ->whereHas('product', fn (Builder $query) => $query->withoutGlobalScope(PublishedScope::class))
                 ->where('cart_token', $cartToken)
                 ->tap(fn (Builder $query) => $this->constrainStorefront($query))
                 ->lockForUpdate()
@@ -273,7 +274,7 @@ final class EloquentCartRepository implements CartRepository
 
     private function mapItem(CartItem $item): CartItemEntity
     {
-        $item->load(self::ITEM_RELATIONS);
+        $item->load($this->itemRelations());
 
         return CartItemMapper::toDomain($item);
     }
@@ -303,8 +304,20 @@ final class EloquentCartRepository implements CartRepository
         }
 
         $query->whereHas('product', fn (Builder $productQuery) => $productQuery
-            ->withoutGlobalScopes()
+            ->withoutGlobalScope(PublishedScope::class)
             ->whereHas('categories', fn (Builder $categoryQuery) => $categoryQuery->whereIn('categories.id', $this->storefrontContext->categoryIds())));
+    }
+
+    private function itemRelations(): array
+    {
+        return [
+            'product' => fn (Builder $query) => $query->withoutGlobalScope(PublishedScope::class),
+            'product.media',
+            'product.categories',
+            'product.primaryCategory',
+            'variant',
+            'variant.media',
+        ];
     }
 
     private function freshExpiry(): \Illuminate\Support\Carbon
@@ -312,4 +325,3 @@ final class EloquentCartRepository implements CartRepository
         return now()->addDays(self::CART_TTL_DAYS);
     }
 }
-

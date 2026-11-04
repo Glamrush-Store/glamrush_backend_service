@@ -35,6 +35,7 @@ beforeEach(function () {
         $table->string('meta_title')->nullable();
         $table->string('meta_description')->nullable();
         $table->timestamps();
+        $table->softDeletes();
     });
 
     Schema::create('product_variants', function ($table) {
@@ -333,6 +334,41 @@ it('scopes a storefront catalog to its active root category tree', function () {
         ->assertJsonPath('data.0.slug', 'hair')
         ->assertJsonCount(1, 'data.0.children')
         ->assertJsonPath('data.0.children.0.slug', 'wigs');
+});
+
+it('excludes soft-deleted products from storefront listings and detail', function () {
+    $rootId = (string) Str::ulid();
+
+    DB::table('categories')->insert([
+        'id' => $rootId,
+        'name' => 'Fragrances',
+        'slug' => 'fragrances',
+        'parent_id' => null,
+        'is_active' => true,
+        'sort_order' => 0,
+        'created_at' => now(),
+        'updated_at' => now(),
+    ]);
+
+    catalogFilterProduct([
+        'name' => 'Visible Perfume',
+        'slug' => 'visible-perfume',
+        'category_id' => $rootId,
+    ]);
+    catalogFilterProduct([
+        'name' => 'Deleted Perfume',
+        'slug' => 'deleted-perfume',
+        'category_id' => $rootId,
+        'deleted_at' => now(),
+    ]);
+
+    $this->getJson('/api/v1/storefronts/fragrances/products')
+        ->assertOk()
+        ->assertJsonCount(1, 'data')
+        ->assertJsonPath('data.0.slug', 'visible-perfume');
+
+    $this->getJson('/api/v1/storefronts/fragrances/products/deleted-perfume')
+        ->assertNotFound();
 });
 
 it('orders storefront category children by sort order', function () {
