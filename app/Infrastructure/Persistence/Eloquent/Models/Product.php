@@ -1,4 +1,5 @@
 <?php
+
 /*
  * © 2025 Demilade Oyewusi
  * Licensed under the MIT License.
@@ -12,12 +13,14 @@ use Abbasudo\Purity\Traits\Sortable;
 use App\Infrastructure\Persistence\Eloquent\Scopes\PublishedScope;
 use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\SoftDeletes;
 
 class Product extends Model
 {
-    use HasUlids, Filterable, Sortable;
+    use Filterable, HasUlids, SoftDeletes, Sortable;
 
     public $incrementing = false;
+
     protected $fillable = [
         'id',
         'name',
@@ -34,6 +37,7 @@ class Product extends Model
         'category_id',
         'brand_id',
     ];
+
     protected $keyType = 'string';
 
     protected $table = 'products';
@@ -41,7 +45,6 @@ class Product extends Model
     protected $casts = [
         'published_at' => 'datetime',
     ];
-
 
     protected array $filterable = [
         'search',   // custom filter
@@ -52,7 +55,6 @@ class Product extends Model
     {
         static::addGlobalScope(new PublishedScope);
     }
-
 
     public function variants()
     {
@@ -74,5 +76,4 @@ class Product extends Model
         return $this->hasOne(ProductVariant::class)
             ->where('is_default', true);
     }
-
 }

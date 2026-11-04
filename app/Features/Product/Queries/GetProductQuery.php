@@ -1,4 +1,5 @@
 <?php
+
 /*
  * © 2025 Demilade Oyewusi
  * Licensed under the MIT License.
@@ -7,31 +8,28 @@
 
 namespace App\Features\Product\Queries;
 
-
 use App\Shared\Contracts\Caching\CacheableQuery;
 
 final class GetProductQuery implements CacheableQuery
 {
     public function __construct(
         public string $slug
-    ) {
-    }
+    ) {}
 
     public function cacheKey(): string
     {
-        return 'products' . md5(json_encode([
-                'slug' => $this->slug,
-            ]));
+        return 'catalog:product:v2:'.md5(json_encode([
+            'slug' => $this->slug,
+        ]));
     }
 
     public function cacheTags(): array
     {
-        return ['products:catalog'];
+        return ['catalog', 'products'];
     }
 
     public function ttl(): int
     {
         return 300;
     }
-
 }
