@@ -16,7 +16,7 @@ final class InitializePaymentRequest extends FormRequest
     {
         return [
             'order_id' => ['required', 'string', 'exists:orders,id'],
-            'payment_method' => ['required', 'string', Rule::in(['paystack', 'flutterwave', 'pay_on_delivery'])],
+            'payment_method' => ['required', 'string', Rule::in(['bachs', 'paystack', 'flutterwave', 'pay_on_delivery'])],
         ];
     }
 }

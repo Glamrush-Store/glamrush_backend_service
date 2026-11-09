@@ -48,8 +48,8 @@ use App\Presentation\Http\Controllers\Payment\InitializePaymentController;
 use App\Presentation\Http\Controllers\Payment\ListPaymentMethodsController;
 use App\Presentation\Http\Controllers\Payment\PaymentWebhookController;
 use App\Presentation\Http\Controllers\Payment\VerifyPaymentController;
-use App\Presentation\Http\Controllers\Shipping\GetShippingOptionsController;
 use App\Presentation\Http\Controllers\Setting\ListSiteSettingsController;
+use App\Presentation\Http\Controllers\Shipping\GetShippingOptionsController;
 use App\Presentation\Http\Controllers\Storefront\GetHomepageController;
 use App\Presentation\Http\Controllers\Storefront\GetStorefrontConfigurationController;
 use Illuminate\Http\Request;
@@ -226,7 +226,7 @@ Route::prefix('v1')->middleware('throttle:api')->group(function () {
     Route::post('/payments/verify', VerifyPaymentController::class)->middleware('throttle:payment-verify');
     Route::post('/payments/webhooks/{provider}', PaymentWebhookController::class)
         ->middleware('throttle:payment-webhook')
-        ->whereIn('provider', ['paystack', 'flutterwave']);
+        ->whereIn('provider', ['bachs', 'paystack', 'flutterwave']);
 });
 
 Route::get('/test', fn () => 'test worked');

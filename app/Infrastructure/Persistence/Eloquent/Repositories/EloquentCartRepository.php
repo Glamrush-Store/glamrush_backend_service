@@ -311,7 +311,7 @@ final class EloquentCartRepository implements CartRepository
     private function itemRelations(): array
     {
         return [
-            'product' => fn (Builder $query) => $query->withoutGlobalScope(PublishedScope::class),
+            'product' => fn ($query) => $query->withoutGlobalScope(PublishedScope::class),
             'product.media',
             'product.categories',
             'product.primaryCategory',
