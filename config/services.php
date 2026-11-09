@@ -55,6 +55,15 @@ return [
         'base_url' => env('FLUTTERWAVE_BASE_URL', 'https://api.flutterwave.com/v3'),
     ],
 
+    'bachs' => [
+        'api_key' => env('BACHS_API_KEY'),
+        'webhook_secret' => env('BACHS_WEBHOOK_SECRET'),
+        'callback_url' => env('BACHS_CALLBACK_URL'),
+        'cancel_url' => env('BACHS_CANCEL_URL'),
+        'base_url' => env('BACHS_BASE_URL', 'https://sandbox-api.bachs.io'),
+        'webhook_tolerance_seconds' => (int) env('BACHS_WEBHOOK_TOLERANCE_SECONDS', 300),
+    ],
+
     'notifications' => [
         'new_order_emails' => env('NEW_ORDER_EMAILS', ''),
         'payment_failed_emails' => env('PAYMENT_FAILED_EMAILS', ''),

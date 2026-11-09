@@ -15,7 +15,7 @@ final class VerifyPaymentRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'provider' => ['required', 'string', Rule::in(['paystack', 'flutterwave'])],
+            'provider' => ['required', 'string', Rule::in(['bachs', 'paystack', 'flutterwave'])],
             'transaction_id' => ['required', 'string'],
         ];
     }
