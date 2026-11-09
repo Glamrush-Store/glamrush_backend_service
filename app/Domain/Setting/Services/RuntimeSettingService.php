@@ -146,6 +146,12 @@ final class RuntimeSettingService
         'FLUTTERWAVE_SECRET_HASH' => 'services.flutterwave.secret_hash',
         'FLUTTERWAVE_CALLBACK_URL' => 'services.flutterwave.callback_url',
         'FLUTTERWAVE_BASE_URL' => 'services.flutterwave.base_url',
+        'BACHS_API_KEY' => 'services.bachs.api_key',
+        'BACHS_WEBHOOK_SECRET' => 'services.bachs.webhook_secret',
+        'BACHS_CALLBACK_URL' => 'services.bachs.callback_url',
+        'BACHS_CANCEL_URL' => 'services.bachs.cancel_url',
+        'BACHS_BASE_URL' => 'services.bachs.base_url',
+        'BACHS_WEBHOOK_TOLERANCE_SECONDS' => 'services.bachs.webhook_tolerance_seconds',
         'R2_ACCESS_KEY_ID' => 'filesystems.disks.r2.key',
         'R2_SECRET_ACCESS_KEY' => 'filesystems.disks.r2.secret',
         'R2_BUCKET' => 'filesystems.disks.r2.bucket',
@@ -164,4 +170,3 @@ final class RuntimeSettingService
         'ABANDONED_CART_EMAILS' => 'services.notifications.abandoned_cart_emails',
     ];
 }
-

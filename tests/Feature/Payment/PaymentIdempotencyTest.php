@@ -1,5 +1,6 @@
 <?php
 
+use App\Infrastructure\Payment\Gateways\BachsPaymentGateway;
 use App\Infrastructure\Payment\Gateways\PaystackPaymentGateway;
 use App\Infrastructure\Persistence\Eloquent\Models\Order;
 use App\Infrastructure\Persistence\Eloquent\Models\Payment;
@@ -17,6 +18,14 @@ uses(RefreshDatabase::class);
 beforeEach(function () {
     Cache::flush();
     config()->set('services.paystack.secret_key', 'test-secret-key');
+    config()->set([
+        'services.bachs.api_key' => 'sk_sandbox_test',
+        'services.bachs.webhook_secret' => 'whsec_test',
+        'services.bachs.callback_url' => 'https://store.test/payment/callback?provider=bachs',
+        'services.bachs.cancel_url' => 'https://store.test/checkout',
+        'services.bachs.base_url' => 'https://sandbox-api.bachs.io',
+        'services.bachs.webhook_tolerance_seconds' => 300,
+    ]);
 
     Schema::create('shipping_rates', function ($table) {
         $table->string('id')->primary();
@@ -206,6 +215,81 @@ it('uses the Paystack reference from a webhook for verification', function () {
             'reference' => 'PAY-WEBHOOK-REFERENCE',
         ],
     ]))->toBe('PAY-WEBHOOK-REFERENCE');
+});
+
+it('initializes a Bachs hosted checkout with a provider idempotency key', function () {
+    paymentMethod('bachs', 'Bachs');
+    $order = paymentOrder();
+
+    Http::fake([
+        'https://sandbox-api.bachs.io/v1/checkout-sessions' => Http::response([
+            'checkout_id' => 'chk_test_123',
+            'checkout_url' => 'https://sandbox-checkout.bachs.io/c/test-123',
+            'status' => 'open',
+        ], 201),
+    ]);
+
+    $response = $this->withHeaders([
+        'X-Cart-Token' => $order->guest_id,
+        'Idempotency-Key' => 'bachs-initialization-test-key',
+    ])->postJson('/api/v1/payments/initialize', [
+        'order_id' => $order->id,
+        'payment_method' => 'bachs',
+    ])->assertCreated()
+        ->assertJsonPath('data.provider', 'bachs')
+        ->assertJsonPath('data.authorization_url', 'https://sandbox-checkout.bachs.io/c/test-123')
+        ->assertJsonPath('data.access_code', 'chk_test_123');
+
+    Http::assertSent(function ($request) use ($order, $response): bool {
+        $reference = $response->json('data.reference');
+
+        return $request->url() === 'https://sandbox-api.bachs.io/v1/checkout-sessions'
+            && $request->hasHeader('Authorization', 'Bearer sk_sandbox_test')
+            && $request->hasHeader('Idempotency-Key', $reference)
+            && $request['pricing'] === ['currency' => 'NGN', 'amount' => '10000.00']
+            && $request['reference'] === $reference
+            && $request['metadata']['order_id'] === $order->id;
+    });
+});
+
+it('verifies a completed Bachs checkout session', function () {
+    Http::fake([
+        'https://sandbox-api.bachs.io/v1/checkout-sessions/chk_test_123' => Http::response([
+            'checkout_id' => 'chk_test_123',
+            'reference' => 'PAY-BACHS-REFERENCE',
+            'status' => 'completed',
+            'payment_status' => 'succeeded',
+            'amount' => '10000.00',
+            'currency' => 'NGN',
+            'charge' => ['charge_id' => 'ch_test_123'],
+        ]),
+    ]);
+
+    $verification = app(BachsPaymentGateway::class)->verify('chk_test_123');
+
+    expect($verification->reference)->toBe('PAY-BACHS-REFERENCE')
+        ->and($verification->transactionId)->toBe('ch_test_123')
+        ->and($verification->providerReference)->toBe('ch_test_123')
+        ->and($verification->status)->toBe('success')
+        ->and($verification->amount)->toBe(10000.0)
+        ->and($verification->currency)->toBe('NGN')
+        ->and($verification->succeeded())->toBeTrue();
+});
+
+it('verifies Bachs webhook signatures and reads the checkout id', function () {
+    $gateway = app(BachsPaymentGateway::class);
+    $payload = json_encode([
+        'id' => 'evt_test_123',
+        'type' => 'collection.succeeded',
+        'data' => ['checkout_id' => 'chk_test_123'],
+    ], JSON_THROW_ON_ERROR);
+    $timestamp = (string) now()->timestamp;
+    $signature = hash_hmac('sha256', $timestamp.'.'.$payload, 'whsec_test');
+
+    expect($gateway->webhookIsValid($payload, "t={$timestamp},v1={$signature}"))->toBeTrue()
+        ->and($gateway->webhookIsValid($payload, "t={$timestamp},v1=invalid"))->toBeFalse()
+        ->and($gateway->transactionIdFromWebhook(json_decode($payload, true, flags: JSON_THROW_ON_ERROR)))
+        ->toBe('chk_test_123');
 });
 
 function paymentMethod(string $code, string $name): string
